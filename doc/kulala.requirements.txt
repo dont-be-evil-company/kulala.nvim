@@ -21,7 +21,7 @@ NEOVIM                               *kulala.requirements-requirements-neovim*
 
 KULALA-CORE                       *kulala.requirements-requirements-kulala-core*
 
-- kulala-core https://github.com/mistweaverco/kulala-core
+- kulala-core https://github.com/dont-be-evil-company/kulala-core
 
 Kulala downloads and manages the kulala-core binary automatically on first use.
 HTTP, gRPC, WebSocket, GraphQL, scripting, and authentication are handled by

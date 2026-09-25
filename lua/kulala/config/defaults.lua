@@ -4,7 +4,7 @@ require("kulala.types")
 local M = {
   kulala_core = {
     -- Optional path to the kulala-core executable
-    -- (https://github.com/mistweaverco/kulala-core).
+    -- (https://github.com/dont-be-evil-company/kulala-core).
     -- When set, this path is used exclusively.
     -- When nil (default), auto-download and
     -- use kulala-core from GitHub releases based on the user's OS and architecture.
@@ -23,7 +23,7 @@ local M = {
     -- - Windows: %APPDATA%\kulala-core
     data_dir = nil,
     -- Optional override for download url
-    download_url = "https://github.com/mistweaverco/kulala-core/releases/download/%s/%s",
+    download_url = "https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s",
     download_tool = "curl", -- or "wget"
   },
   -- Restore request history and UI after sourcing a vim session (:h 'sessionoptions' globals).

@@ -17,7 +17,7 @@ if ($Env:GH_CACHE_HIT -eq $null) {
 }
 
 if ($Env:GH_CACHE_HIT -eq $null) {
-  Invoke-RestMethod -Uri https://github.com/mistweaverco/luajit-for-win64/archive/refs/tags/v0.0.2.zip -outfile luajit.zip
+  Invoke-RestMethod -Uri https://github.com/dont-be-evil-company/luajit-for-win64/archive/refs/tags/v0.0.2.zip -outfile luajit.zip
   7z x luajit.zip
   RM luajit.zip
   cd luajit-for-win64-0.0.2

@@ -169,9 +169,9 @@ local process_variables = function(request, silent)
   -- because the body may contain already parsed GQL.
   -- See:
   -- - GraphQL request with pre-request script, body not converted to json
-  --   https://github.com/mistweaverco/kulala.nvim/issues/844
+  --   https://github.com/dont-be-evil-company/kulala.nvim/issues/844
   -- - Variables in request body not re-evaluated on request.replay()
-  --   https://github.com/mistweaverco/kulala.nvim/issues/814
+  --   https://github.com/dont-be-evil-company/kulala.nvim/issues/814
   if request.type == "graphql" then
     process_graphql(request)
   else

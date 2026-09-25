@@ -22,7 +22,7 @@
 ---@field path string|nil Path to kulala-core executable
 ---@field timeout number|nil Timeout in milliseconds for the kulala-core sub-process; nil disables the timeout
 ---@field data_dir string|nil Override for kulala-core data dir
----@field download_url string|"https://github.com/mistweaverco/kulala-core/releases/download/%s/%s" Override for download url
+---@field download_url string|"https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s" Override for download url
 ---@field download_tool "curl"|"wget"|string curl or wget or full path to the download curl or wget
 
 ---@class KulalaDefaultConfigSession

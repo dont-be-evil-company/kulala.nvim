@@ -22,7 +22,7 @@ RUN scoop install main/neovim@0.10.2
 
 WORKDIR "C:\\luajjt"
 
-RUN Invoke-RestMethod -Uri https://github.com/mistweaverco/luajit-for-win64/archive/refs/tags/v0.0.2.zip -outfile luajit.zip
+RUN Invoke-RestMethod -Uri https://github.com/dont-be-evil-company/luajit-for-win64/archive/refs/tags/v0.0.2.zip -outfile luajit.zip
 RUN 7z x luajit.zip
 
 WORKDIR "C:\\luajjt\luajit-for-win64-0.0.2"

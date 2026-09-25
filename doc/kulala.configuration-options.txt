@@ -30,7 +30,7 @@ See `lua/kulala/config/defaults.lua` for the complete default table. Example
         path = nil,
         timeout = 60000,
         data_dir = nil,
-        download_url = "https://github.com/mistweaverco/kulala-core/releases/download/%s/%s",
+        download_url = "https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s",
       },
       session = {
         restore = true, -- requires `set sessionoptions+=globals`
@@ -84,7 +84,7 @@ scripting, and authentication are handled by kulala-core.
       path = nil,       -- custom binary path; nil = auto-download
       timeout = 60000,  -- subprocess timeout in ms; nil = no timeout
       data_dir = nil,   -- persistence dir for cookies, OAuth, prompts
-      download_url = "https://github.com/mistweaverco/kulala-core/releases/download/%s/%s",
+      download_url = "https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s",
     }
 <
 
@@ -132,7 +132,7 @@ Example:
 
 >lua
     {
-    "mistweaverco/kulala.nvim",
+    "dont-be-evil-company/kulala.nvim",
       opts = {
         environment_scope = "b",
       },
@@ -156,7 +156,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         default_env = "default",
       },
@@ -184,7 +184,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         vscode_rest_client_environmentvars = true,
       },
@@ -245,7 +245,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         urlencode = "skipencoded",
         urlencode_skip = "%[%]",
@@ -304,7 +304,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         contenttypes = {
           ["text/xml"] = {
@@ -370,7 +370,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         contenttypes = {
           ["text/plain"] = {
@@ -423,7 +423,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         contenttypes = {
           ["text/xml"] = {
@@ -456,7 +456,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         debug = 3,
       },
@@ -503,7 +503,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           display_mode = "float",
@@ -532,7 +532,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           split_direction = "right",
@@ -552,7 +552,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           ---@type kulala.ui.win_config
@@ -589,7 +589,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           default_view = "body",
@@ -642,7 +642,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           winbar = true,
@@ -672,7 +672,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           default_winbar_panes = { "body", "headers", "headers_body", "verbose" },
@@ -724,7 +724,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           show_variable_info_text = false,
@@ -832,7 +832,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           show_request_summary = false,
@@ -906,7 +906,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       opts = {
         ui = {
           scratchpad_default_contents = {
@@ -1000,7 +1000,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       global_keymaps = true,
     }
 <
@@ -1029,7 +1029,7 @@ Example:
 
 >lua
     {
-      "mistweaverco/kulala.nvim",
+      "dont-be-evil-company/kulala.nvim",
       kulala_keymaps = false,
     }
 <

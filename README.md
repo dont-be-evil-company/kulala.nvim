@@ -83,7 +83,7 @@ Via [lazy.nvim](https://github.com/folke/lazy.nvim):
 ```lua
 require("lazy").setup({
   {
-    "mistweaverco/kulala.nvim",
+    "dont-be-evil-company/kulala.nvim",
     -- Load before session save/restore so VimLeavePre and SessionLoadPost hooks are registered.
     event = { "SessionLoadPost", "VimLeavePre" },
     keys = {
@@ -97,7 +97,7 @@ require("lazy").setup({
     opts = {
       kulala_core = {
         -- Optional path to the kulala-core executable
-        -- (https://github.com/mistweaverco/kulala-core).
+        -- (https://github.com/dont-be-evil-company/kulala-core).
         -- When set, this path is used exclusively.
         -- When nil (default), auto-download and
         -- use kulala-core from GitHub releases based on the user's OS and architecture.
@@ -116,7 +116,7 @@ require("lazy").setup({
         -- - Windows: %APPDATA%\kulala-core
         data_dir = nil,
         -- Optional override for download url
-        download_url = "https://github.com/mistweaverco/kulala-core/releases/download/%s/%s",
+        download_url = "https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s",
         -- "curl" or "wget" or full path to "curl" or "wget" executable.
         download_tool = "curl",
       },
@@ -397,24 +397,24 @@ HTTP requests from within Neovim.
 
 
 [restnvim-unarchived-post]: https://github.com/rest-nvim/rest.nvim/issues/398#issue-2442747909
-[badge-discord]: https://mistweaverco.com/assets/badges/discord.svg
-[discord]: https://mistweaverco.com/discord
-[badge-made-with-love]: https://mistweaverco.com/assets/badges/made-with-love.svg
-[contributors]: https://github.com/mistweaverco/kulala.nvim/graphs/contributors
-[badge-test-status]: https://img.shields.io/github/actions/workflow/status/mistweaverco/kulala.nvim/tests.yml?label=main&branch=main&style=for-the-badge
-[link-test-status]: https://github.com/mistweaverco/kulala.nvim/actions/workflows/tests.yml
+[badge-discord]: https://the-dont-be-evil-company.com/assets/badges/discord.svg
+[discord]: https://the-dont-be-evil-company.com/discord
+[badge-made-with-love]: https://the-dont-be-evil-company.com/assets/badges/made-with-love.svg
+[contributors]: https://github.com/dont-be-evil-company/kulala.nvim/graphs/contributors
+[badge-test-status]: https://img.shields.io/github/actions/workflow/status/dont-be-evil-company/kulala.nvim/tests.yml?label=main&branch=main&style=for-the-badge
+[link-test-status]: https://github.com/dont-be-evil-company/kulala.nvim/actions/workflows/tests.yml
 [rest-nvim]: https://github.com/rest-nvim/rest.nvim
 [curl-nvim]: https://github.com/oysandvik94/curl.nvim
-[kulala-cli]: https://github.com/mistweaverco/kulala-cli
-[kulala-fmt]: https://github.com/mistweaverco/kulala-fmt
-[kulala-desktop]: https://github.com/mistweaverco/kulala-desktop
-[kulala.vscode]: https://github.com/mistweaverco/kulala.vscode
-[kulala-core]: https://github.com/mistweaverco/kulala-core
-[kulala-github-action]: https://github.com/mistweaverco/kulala-github-action
+[kulala-cli]: https://github.com/dont-be-evil-company/kulala-cli
+[kulala-fmt]: https://github.com/dont-be-evil-company/kulala-fmt
+[kulala-desktop]: https://github.com/dont-be-evil-company/kulala-desktop
+[kulala.vscode]: https://github.com/dont-be-evil-company/kulala.vscode
+[kulala-core]: https://github.com/dont-be-evil-company/kulala-core
+[kulala-github-action]: https://github.com/dont-be-evil-company/kulala-github-action
 [demo-image]: https://github.com/user-attachments/assets/a7b3b01f-0115-44dc-94d2-8abd4db6fb60
-[badge-development-status]: https://mistweaverco.com/assets/badges/development-status.svg
-[development-status]: https://mistweaverco.com/roadmap?filter=kulala.nvim
-[badge-ai-policy]: https://mistweaverco.com/assets/badges/ai-policy.svg
-[ai-policy]: https://mistweaverco.com/ai-policy
-[badge-our-manifesto]: https://mistweaverco.com/assets/badges/our-manifesto.svg
-[our-manifesto]: https://mistweaverco.com/manifesto
+[badge-development-status]: https://the-dont-be-evil-company.com/assets/badges/development-status.svg
+[development-status]: https://the-dont-be-evil-company.com/roadmap?filter=kulala.nvim
+[badge-ai-policy]: https://the-dont-be-evil-company.com/assets/badges/ai-policy.svg
+[ai-policy]: https://the-dont-be-evil-company.com/ai-policy
+[badge-our-manifesto]: https://the-dont-be-evil-company.com/assets/badges/our-manifesto.svg
+[our-manifesto]: https://the-dont-be-evil-company.com/manifesto

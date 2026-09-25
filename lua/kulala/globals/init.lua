@@ -18,6 +18,6 @@ M.HEADERS_FILE = plugin_tmp_dir .. "/headers.txt"
 M.BODY_FILE = plugin_tmp_dir .. "/body.txt"
 M.COOKIES_JAR_FILE = plugin_tmp_dir .. "/cookies.txt"
 M.SETTINGS_FILE = vim.fn.stdpath("state") .. "/kulala.nvim/settings.json"
-M.TREESITTER_REPO_URL = "https://github.com/mistweaverco/tree-sitter-kulala-http"
+M.TREESITTER_REPO_URL = "https://github.com/dont-be-evil-company/tree-sitter-kulala-http"
 
 return M
