@@ -27,11 +27,16 @@ To establish a websocket connection, use the following format:
     { "name": "world" }
 <
 
-If there is a body in the request, it will be sent upon connection to the
-server.
+If there is a body in the request, it is sent when the connection opens.
+Use `===` to script further messages. See |kulala.websockets-websockets-usage|.
 
 
 MESSAGES
+
+Separate client messages in the request body with `===`. The next message is
+sent immediately. Put `=== wait-for-server` before a message to send it only
+after one server message arrives. Repeat that line to wait for more than one
+server message.
 
 Incoming messages are prefixed with `<--` and outgoing messages with `-->`.
 Both are shown in chronological order in the body view.
@@ -39,7 +44,8 @@ Both are shown in chronological order in the body view.
 
 SENDING MESSAGES
 
-To send messages to the server, simply type the message and press `<CR>`.
+Messages separated with `===` are sent automatically when the connection
+opens. To send more, type the message and press `<CR>`.
 
 
 CLOSING THE CONNECTION

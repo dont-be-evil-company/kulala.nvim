@@ -121,6 +121,9 @@ function M.refresh_display(target)
   target = target or M.response
   if not target then return end
   local prefix = target._ws_welcome or ""
+  if type(target._ws_status) == "string" and target._ws_status ~= "" then
+    prefix = prefix .. target._ws_status .. "\n"
+  end
   local messages = target._ws_messages or {}
   local stream = build_ws_display_stream(messages)
   target.body_raw = build_ws_jq_source(messages)
@@ -192,10 +195,26 @@ M.on_stdout = function(_, data, callback)
       notify_ui(callback, false)
     elseif msg and msg.type == "error" then
       local err = msg.error or "WebSocket error"
-      Logger.error("Error connecting to WS: " .. err)
-      M.response.errors = vim.trim((M.response.errors or "") .. "\n" .. err)
-      M.response.body = (M.response._ws_welcome or "") .. "WebSocket error: " .. err .. "\n"
-      notify_ui(callback, false)
+      if M.response._ws_welcome then
+        M.response._ws_status = err
+        M.response.errors = vim.trim((M.response.errors or "") .. "\n" .. err)
+        M.refresh_display()
+        notify_ui(callback, true, { refresh_only = true })
+      else
+        Logger.error("Error connecting to WS: " .. err)
+        M.response.errors = vim.trim((M.response.errors or "") .. "\n" .. err)
+        M.response.body = (M.response._ws_welcome or "") .. "WebSocket error: " .. err .. "\n"
+        notify_ui(callback, false)
+      end
+    elseif msg and msg.type == "waiting" then
+      local remaining = tonumber(msg.remaining) or 0
+      M.response._ws_status = string.format("Waiting for %d server message(s)...", remaining)
+      M.refresh_display()
+      notify_ui(callback, true, { refresh_only = true })
+    elseif msg and msg.type == "script-done" then
+      M.response._ws_status = "Script finished. Compose a message to send more."
+      M.refresh_display()
+      notify_ui(callback, true, { refresh_only = true })
     end
   end
 end
@@ -230,6 +249,7 @@ local function set_welcome_message()
 
   M.response._ws_welcome = (
     "Connected... Waiting for data."
+    .. "\nScripted === messages are sent automatically."
     .. "\nPress %s in the body view to compose a message."
     .. "\nPress %s to close the connection.\n\n"
   ):format(send_key, close_conn_key)
@@ -241,7 +261,10 @@ function M.connect(request, response, callback, opts)
   response.body = ""
   response.body_raw = ""
   response._ws_messages = {}
-  local initial = vim.trim(request.body_computed or request.body or "")
+  local script_messages = request._ws_script_messages
+  local initial_source = script_messages and (request.body_computed or "")
+    or (request.body_computed or request.body or "")
+  local initial = vim.trim(initial_source)
   response._ws_initial_message = initial ~= "" and initial or nil
 
   if M.connection then M.close() end
@@ -252,7 +275,6 @@ function M.connect(request, response, callback, opts)
 
   ---kulala-core resolves URL/headers/body; nvim must not substitute locally.
   local connect_url = request._kulala_final_url or request._kulala_sent_url or request.url or ""
-  local connect_body = request.body_computed or request.body
   local connect_headers = request.headers or {}
 
   local function handler(event)
@@ -276,8 +298,10 @@ function M.connect(request, response, callback, opts)
   local status, result = xpcall(function()
     return KULALA_CORE.websocket_start({
       url = connect_url,
-      body = connect_body,
+      body = script_messages and nil or (request.body_computed or request.body),
       headers = connect_headers,
+      messages = script_messages,
+      timeoutMs = request._ws_timeout_ms,
     }, {
       on_stdout = handler("on_stdout"),
       on_stderr = handler("on_stderr"),

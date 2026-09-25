@@ -1258,7 +1258,7 @@ function M.from_curl(curl)
 end
 
 ---Start a long-lived WebSocket session (native kulala-core, replaces websocat).
----@param opts { url: string, body?: string, headers?: table }
+---@param opts { url: string, body?: string, headers?: table, messages?: table, timeoutMs?: number }
 ---@param handlers { on_stdout: function, on_stderr: function, on_exit: function }
 ---@param cwd string|nil
 ---@return vim.SystemObj|nil
@@ -1270,9 +1270,14 @@ function M.websocket_start(opts, handlers, cwd)
   local tmp = vim.fn.tempname() .. ".json"
   local payload = {
     url = opts.url,
-    body = opts.body,
     headers = opts.headers,
   }
+  if type(opts.messages) == "table" then
+    payload.messages = opts.messages
+    if type(opts.timeoutMs) == "number" then payload.timeoutMs = opts.timeoutMs end
+  else
+    payload.body = opts.body
+  end
   vim.fn.writefile({ vim.json.encode(payload) }, tmp)
 
   return vim.system({ exe, "--websocket", "-i", tmp }, {

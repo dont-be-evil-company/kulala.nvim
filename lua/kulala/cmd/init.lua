@@ -1063,7 +1063,13 @@ local function kulala_core_deliver_result(item, target, duration_wall, callback,
       _kulala_core = true,
       _kulala_media_type = "application/json",
     }
-    target.body_computed = item.initialMessage or target.body
+    if type(item.messages) == "table" then
+      target._ws_script_messages = item.messages
+      if type(item.timeoutMs) == "number" then target._ws_timeout_ms = item.timeoutMs end
+      target.body_computed = type(item.initialMessage) == "string" and item.initialMessage or nil
+    else
+      target.body_computed = item.initialMessage or target.body
+    end
     WEBSOCKET.connect(target, response, function(success, duration)
       handle_response({
         code = success and 0 or 1,
