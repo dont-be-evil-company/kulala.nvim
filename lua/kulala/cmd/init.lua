@@ -409,6 +409,12 @@ local function save_response(request_status, parsed_request)
   local headers_from_snapshot = type(request_status._kulala_headers_snapshot) == "string"
 
   local responses = DB.global_update().responses
+  for i = #responses, 1, -1 do
+    if responses[i].id == id and responses[i]._kulala_http_stream then
+      table.remove(responses, i)
+      break
+    end
+  end
   if #responses > 0 and responses[#responses].id == id and responses[#responses].code == -1 then
     -- Drop unfinished chunked response for the same request id.
     table.remove(responses)
@@ -1268,9 +1274,12 @@ process_request_kulala_core = function(parsed_request, callback, retry_depth, ru
 
   local start_time = vim.uv.hrtime()
   local run_payload, core_cwd = build_kulala_core_run_payload(parsed_request, run_opts)
+  local HTTP_STREAM = require("kulala.cmd.http_stream")
+  HTTP_STREAM.reset()
 
   KULALA_CORE.run_async(run_payload, core_cwd, function(wrapper, err)
     vim.schedule(function()
+      HTTP_STREAM.reset()
       if err then
         handle_response({
           code = 1,
@@ -1282,7 +1291,21 @@ process_request_kulala_core = function(parsed_request, callback, retry_depth, ru
       end
       finish_kulala_core_wrapper(wrapper, parsed_request, callback, retry_depth, start_time, core_cwd, run_opts)
     end)
-  end)
+  end, {
+    on_http_stream = function(event)
+      local targets = kulala_core_run_targets(parsed_request)
+      local target = parsed_request
+      if type(event.blockName) == "string" and event.blockName ~= "" then
+        for _, candidate in ipairs(targets) do
+          if candidate._kulala_block_name == event.blockName then
+            target = candidate
+            break
+          end
+        end
+      end
+      HTTP_STREAM.on_event(event, target, callback)
+    end,
+  })
 end
 
 ---Executes DocumentRequest

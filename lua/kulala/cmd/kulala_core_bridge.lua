@@ -164,6 +164,25 @@ function M.try_decode_wrapper(stdout)
   return nil
 end
 
+---@param payload table|nil
+---@return boolean
+local function payload_keep_alive(payload)
+  return type(payload) == "table"
+    and type(payload.content) == "string"
+    and payload.content:find("@kulala-keep-alive-stream", 1, true) ~= nil
+end
+
+---One stdout line from a keep-alive run, or nil when it belongs to the final JSON document.
+---@param line string
+---@return table|nil
+function M.parse_http_stream_line(line)
+  local trimmed = vim.trim(line or "")
+  if trimmed:sub(1, 1) ~= "{" then return nil end
+  local ok, value = pcall(vim.json.decode, trimmed)
+  if not ok or type(value) ~= "table" or value.type ~= "http-stream" then return nil end
+  return value
+end
+
 ---Stop the in-flight kulala-core subprocess (e.g. Ctrl+C interrupt).
 ---@return boolean stopped
 function M.interrupt_active()
@@ -179,20 +198,80 @@ end
 ---@param payload table
 ---@param cwd string|nil
 ---@param on_done fun(job: vim.SystemCompleted)
-function M.invoke_async(payload, cwd, on_done)
+---@param hooks? { on_http_stream?: fun(event: table) }
+function M.invoke_async(payload, cwd, on_done, hooks)
   local exe = M.require_enabled()
+  hooks = hooks or {}
+  local keep_alive = payload_keep_alive(payload)
   local opts = {
     stdin = vim.json.encode(payload) .. "\n",
     text = true,
     env = env_with_data_dir(),
   }
-  local timeout_ms = invoke_timeout_ms()
-  if timeout_ms then opts.timeout = timeout_ms end
+  if not keep_alive then
+    local timeout_ms = invoke_timeout_ms()
+    if timeout_ms then opts.timeout = timeout_ms end
+  end
   if type(cwd) == "string" and cwd ~= "" and vim.fn.isdirectory(cwd) == 1 then opts.cwd = cwd end
 
+  if not keep_alive then
+    M.active_job = vim.system({ exe }, opts, function(job)
+      if M.active_job == job then M.active_job = nil end
+      on_done(job)
+    end)
+    return
+  end
+
+  local acc = {}
+  local line_buf = ""
+  local flushed = false
+
+  local function take_line(line)
+    local event = M.parse_http_stream_line(line)
+    if event then
+      if hooks.on_http_stream then vim.schedule(function()
+        hooks.on_http_stream(event)
+      end) end
+      return
+    end
+    acc[#acc + 1] = line
+    acc[#acc + 1] = "\n"
+  end
+
+  local function consume(data)
+    if data == nil then
+      if flushed then return end
+      flushed = true
+      if line_buf ~= "" then
+        take_line(line_buf)
+        line_buf = ""
+      end
+      return
+    end
+    line_buf = line_buf .. data
+    while true do
+      local nl = line_buf:find("\n", 1, true)
+      if not nl then break end
+      local line = line_buf:sub(1, nl - 1)
+      line_buf = line_buf:sub(nl + 1)
+      if line:sub(-1) == "\r" then line = line:sub(1, -2) end
+      take_line(line)
+    end
+  end
+
+  opts.stdout = function(_, data)
+    consume(data)
+  end
+
   M.active_job = vim.system({ exe }, opts, function(job)
+    consume(nil)
     if M.active_job == job then M.active_job = nil end
-    on_done(job)
+    on_done {
+      code = job.code,
+      signal = job.signal,
+      stdout = table.concat(acc),
+      stderr = job.stderr,
+    }
   end)
 end
 
@@ -206,7 +285,9 @@ function M.invoke(payload, cwd)
     completed = job
     done = true
   end)
-  vim.wait(invoke_timeout_ms() or 600000, function()
+  local wait_ms = invoke_timeout_ms() or 600000
+  if payload_keep_alive(payload) then wait_ms = 24 * 60 * 60 * 1000 end
+  vim.wait(wait_ms, function()
     return done
   end, 20)
   return completed or { code = 124, stdout = "", stderr = "kulala-core subprocess timed out" }
@@ -330,13 +411,14 @@ end
 ---@param payload table
 ---@param cwd string|nil
 ---@param on_done fun(wrapper: table|nil, err: string|nil)
-function M.run_async(payload, cwd, on_done)
+---@param hooks? { on_http_stream?: fun(event: table) }
+function M.run_async(payload, cwd, on_done, hooks)
   M.require_enabled()
   payload.action = "run"
   M.invoke_async(payload, cwd, function(job)
     local wrapper, err = run_result_from_job(job)
     on_done(wrapper, err)
-  end)
+  end, hooks)
 end
 
 ---@param job vim.SystemCompleted

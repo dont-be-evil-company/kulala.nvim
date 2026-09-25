@@ -105,7 +105,9 @@ function M.size()
     ]])
     local TIOCGWINSZ = vim.fn.has("linux") == 1 and 0x5413 or 0x40087468
     local sz = ffi.new("winsize")
-    if ffi.C.ioctl(1, TIOCGWINSZ, sz) ~= 0 or sz.col == 0 or sz.row == 0 then return end
+    if ffi.C.ioctl(1, TIOCGWINSZ, sz) ~= 0 or sz.col == 0 or sz.row == 0 or sz.xpixel == 0 or sz.ypixel == 0 then
+      return
+    end
     size = {
       width = sz.xpixel,
       height = sz.ypixel,
