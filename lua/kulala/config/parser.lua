@@ -116,7 +116,7 @@ local function build_parser(finish_progress_handler)
       end)
     else
       vim.schedule(function()
-        ensure_site_rtp()
+        refresh_rtp()
         save_parser_ver()
         M.register_parser()
         if vim.bo.filetype == "http" then vim.cmd("edit!") end
