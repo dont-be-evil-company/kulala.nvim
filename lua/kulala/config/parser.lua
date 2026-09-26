@@ -38,9 +38,7 @@ end
 --- Refresh Neovim's runtime discovery after installing parser/query
 --- files into an existing runtimepath directory.
 local function refresh_rtp()
-  if not vim.list_contains(vim.opt.rtp:get(), site_dir) then
-    vim.opt.rtp:append(site_dir)
-  end
+  if not vim.list_contains(vim.opt.rtp:get(), site_dir) then vim.opt.rtp:append(site_dir) end
   vim.o.runtimepath = vim.o.runtimepath
 end
 
