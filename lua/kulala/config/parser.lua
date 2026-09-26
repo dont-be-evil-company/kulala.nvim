@@ -34,12 +34,14 @@ local function is_parser_ver_current()
   return current_version == Globals.TREESITTER_VERSION
 end
 
---- HACK:
---- Neovim does not rescan rtp for parser/queries added mid-session. Re-appending
---- the site dir refreshes discovery after a fresh install/build.
-local function ensure_site_rtp()
-  vim.opt.rtp:remove(site_dir)
-  vim.opt.rtp:append(site_dir)
+--- INFO:
+--- Refresh Neovim's runtime discovery after installing parser/query
+--- files into an existing runtimepath directory.
+local function refresh_rtp()
+  if not vim.list_contains(vim.opt.rtp:get(), site_dir) then
+    vim.opt.rtp:append(site_dir)
+  end
+  vim.o.runtimepath = vim.o.runtimepath
 end
 
 local function sync_queries()
@@ -60,8 +62,8 @@ M.register_parser = function()
   parser_registered = true
   -- kulala_http/*.scm live under tree-sitter-kulala-http/queries/
   if Fs.dir_exists(parser_source_path) then vim.opt.rtp:prepend(parser_source_path) end
-  ensure_site_rtp()
   sync_queries()
+  refresh_rtp()
   vim.treesitter.language.register(parser_name, filetypes)
   vim.treesitter.language.register("markdown", "kulala_ui")
   local backend = require("kulala.backend")
