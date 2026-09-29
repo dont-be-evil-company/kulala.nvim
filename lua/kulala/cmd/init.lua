@@ -1371,7 +1371,7 @@ M.run_parser = function(requests, line_nr, callback, run_opts)
   end
 
   if not requests then requests = DOCUMENT_PARSER.get_document() end
-  if not requests then return Logger.error("No requests found in the document") end
+  if not requests then return end
 
   requests = DOCUMENT_PARSER.get_request_at(requests, line_nr)
   if #requests == 0 then return Logger.error("No request found at current line") end
