@@ -99,8 +99,9 @@ require("lazy").setup({
         -- Optional path to the kulala-core executable
         -- (https://github.com/dont-be-evil-company/kulala-core).
         -- When set, this path is used exclusively.
-        -- When nil (default), auto-download and
-        -- use kulala-core from GitHub releases based on the user's OS and architecture.
+        -- When nil (default), auto-download kulala-core from
+        -- https://core.kulala.app for the user's OS and architecture.
+        -- Set KULALA_CORE_LICENSE_TOKEN to skip the license prompt.
         path = nil,
         -- Subprocess timeout (ms) for kulala-core.
         -- Default is 60000 (1 minute).
@@ -116,7 +117,7 @@ require("lazy").setup({
         -- - Windows: %APPDATA%\kulala-core
         data_dir = nil,
         -- Optional override for download url
-        download_url = "https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s",
+        download_url = "https://core.kulala.app/releases/%s/%s",
         -- "curl" or "wget" or full path to "curl" or "wget" executable.
         download_tool = "curl",
       },

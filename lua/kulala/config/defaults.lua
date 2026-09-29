@@ -7,7 +7,9 @@ local M = {
     -- (https://github.com/dont-be-evil-company/kulala-core).
     -- When set, this path is used exclusively.
     -- When nil (default), auto-download and
-    -- use kulala-core from GitHub releases based on the user's OS and architecture.
+    -- use kulala-core from https://core.kulala.app based on the user's OS and architecture.
+    -- A missing or outdated binary asks for a license token unless
+    -- KULALA_CORE_LICENSE_TOKEN is set.
     path = nil,
     -- Subprocess timeout (ms) for kulala-core.
     -- Default is 60000 (1 minute).
@@ -23,7 +25,7 @@ local M = {
     -- - Windows: %APPDATA%\kulala-core
     data_dir = nil,
     -- Optional override for download url
-    download_url = "https://github.com/dont-be-evil-company/kulala-core/releases/download/%s/%s",
+    download_url = "https://core.kulala.app/releases/%s/%s",
     download_tool = "curl", -- or "wget"
   },
   -- Restore request history and UI after sourcing a vim session (:h 'sessionoptions' globals).
