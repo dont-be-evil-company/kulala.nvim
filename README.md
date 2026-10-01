@@ -101,7 +101,7 @@ require("lazy").setup({
         -- When set, this path is used exclusively.
         -- When nil (default), auto-download kulala-core from
         -- https://core.kulala.app for the user's OS and architecture.
-        -- Set KULALA_CORE_LICENSE_TOKEN to skip the license prompt.
+        -- Set KULALA_CORE_LICENSE_TOKEN to skip the license prompt on first use.
         path = nil,
         -- Subprocess timeout (ms) for kulala-core.
         -- Default is 60000 (1 minute).

@@ -64,7 +64,65 @@ local function make_executable(path)
   if not IS_WINDOWS then vim.fn.system { "chmod", "+x", path } end
 end
 
+local VERSION_PROBE_TIMEOUT_MS = 15000
+
+local function version_probe_ok(result)
+  if not result or result.code ~= 0 then return false end
+  return vim.trim(result.stdout or "") ~= ""
+end
+
+---Run `kulala-core --version`. On macOS, clear quarantine once and retry.
+---@param bin_path string
+---@param on_done fun(ok: boolean)
+local function probe_installed_binary(bin_path, on_done)
+  local function run(after)
+    vim.system({ bin_path, "--version" }, { text = true, timeout = VERSION_PROBE_TIMEOUT_MS }, function(result)
+      vim.schedule(function()
+        after(result)
+      end)
+    end)
+  end
+
+  run(function(result)
+    if version_probe_ok(result) then
+      on_done(true)
+      return
+    end
+    if vim.uv.os_uname().sysname ~= "Darwin" then
+      on_done(false)
+      return
+    end
+    vim.system({ "xattr", "-d", "com.apple.quarantine", bin_path }, { text = true }, function()
+      run(function(retry)
+        on_done(version_probe_ok(retry))
+      end)
+    end)
+  end)
+end
+
+local function report_launch_failure(bin_path)
+  if vim.fn.filereadable(bin_path) == 1 then vim.fn.delete(bin_path) end
+  if vim.uv.os_uname().sysname == "Darwin" then
+    Logger.error(
+      "macOS refused to start kulala-core. The downloaded binary is signed incorrectly or blocked by Gatekeeper."
+    )
+  else
+    Logger.error("kulala-core --version failed. The downloaded binary did not start.")
+  end
+end
+
+---Kulala Core data directory. Matches `kulala_core_bridge.effective_data_dir`.
+---The token lives here so a plugin or client update does not throw it away.
+local function kulala_core_data_dir()
+  return require("kulala.cmd.kulala_core_bridge").effective_data_dir()
+end
+
 local function license_token_path()
+  return join_paths(kulala_core_data_dir(), "license-token")
+end
+
+---Previous config-directory location, kept so an already entered token is reused.
+local function legacy_license_token_path()
   local sys = vim.uv.os_uname().sysname
   if sys == "Windows_NT" then
     local appdata = vim.env.APPDATA or join_paths(vim.env.USERPROFILE or "", "AppData", "Roaming")
@@ -77,8 +135,8 @@ local function license_token_path()
   return join_paths(vim.env.HOME, ".config", "kulala", "license-token")
 end
 
-local function read_saved_license_token()
-  local f = io.open(license_token_path(), "r")
+local function read_token_file(path)
+  local f = io.open(path, "r")
   if not f then return nil end
   local token = vim.trim(f:read("*a") or "")
   f:close()
@@ -99,9 +157,20 @@ local function save_license_token(token)
   if not IS_WINDOWS then vim.fn.setfperm(path, "rw-------") end
 end
 
+local function read_saved_license_token()
+  local saved = read_token_file(license_token_path())
+  if saved then return saved end
+  local legacy = read_token_file(legacy_license_token_path())
+  if not legacy then return nil end
+  save_license_token(legacy)
+  return legacy
+end
+
+---Remove the saved token. Call only after the download server rejects it.
 local function delete_saved_license_token()
-  local path = license_token_path()
-  if vim.fn.filereadable(path) == 1 then vim.fn.delete(path) end
+  for _, path in ipairs { license_token_path(), legacy_license_token_path() } do
+    if vim.fn.filereadable(path) == 1 then vim.fn.delete(path) end
+  end
 end
 
 ---Prompt for a license token and save it. Returns nil when the user cancels.
@@ -598,6 +667,7 @@ M.install = function(version, callback)
 
   local retried = false
   local function on_download(download_success, http_code)
+    -- Keep a saved token across updates. Drop it only when the server rejects it.
     if not download_success and (http_code == 401 or http_code == 403) and not retried then
       retried = true
       if token_source ~= "env" then delete_saved_license_token() end
@@ -638,23 +708,32 @@ M.install = function(version, callback)
       time_str = string.format("%d.%03ds", seconds, milliseconds)
     end
 
+    local bin_path = join_paths(bin_dir, M.get_bin_name())
     if vim.fn.filereadable(download_file_path) == 1 then
       -- make it executable
       if not IS_WINDOWS then vim.fn.system { "chmod", "+x", download_file_path } end
       -- Rename the downloaded file
-      vim.fn.rename(download_file_path, join_paths(bin_dir, M.get_bin_name()))
+      vim.fn.rename(download_file_path, bin_path)
     else
       Logger.error("Downloaded file not found at expected location: " .. download_file_path)
       if callback then callback(false) end
       return
     end
 
-    Logger.notify(string.format("Backend installed successfully in %s!", time_str), Logger.LoggerLogLevels.info)
-    -- Set the installed version after successful installation
-    set_installed_version(version)
-    require("kulala.config").set_autocomands()
-    require("kulala.cmd.lsp").restart_all()
-    if callback then callback() end
+    probe_installed_binary(bin_path, function(ok)
+      if not ok then
+        report_launch_failure(bin_path)
+        if callback then callback(false) end
+        return
+      end
+
+      Logger.notify(string.format("Backend installed successfully in %s!", time_str), Logger.LoggerLogLevels.info)
+      -- Set the installed version after the binary has actually started.
+      set_installed_version(version)
+      require("kulala.config").set_autocomands()
+      require("kulala.cmd.lsp").restart_all()
+      if callback then callback() end
+    end)
   end
 
   download_file_async(url, download_file_path, download_progress, on_download, token)
@@ -664,9 +743,30 @@ M.is_up_to_date = function()
   return binary_exists() and version_matches()
 end
 
+local install_inflight = false
+local install_waiters = {}
+
+local function finish_install(callback)
+  install_inflight = false
+  local waiters = install_waiters
+  install_waiters = {}
+
+  if binary_exists() and version_matches() then
+    if Parser.is_up_to_date() then Api.trigger("ready") end
+  else
+    Logger.error("Backend installation failed or binary is not accessible")
+  end
+
+  if callback then callback() end
+  for _, waiter in ipairs(waiters) do
+    waiter()
+  end
+end
+
 ---Ensure the backend binary is installed and up-to-date
 ---If development mode is enabled, skip the check (assumes running from source)
 ---If binary is not found or version doesn't match, download the required version
+---Concurrent callers share one download and one license prompt.
 ---@param callback function|nil Optional callback to run after installation
 M.ensure_installed = function(callback)
   local required_version = get_required_version()
@@ -676,6 +776,13 @@ M.ensure_installed = function(callback)
     if callback then callback() end
     return
   end
+
+  if install_inflight then
+    if callback then table.insert(install_waiters, callback) end
+    return
+  end
+
+  install_inflight = true
 
   -- Determine reason for download
   local reason
@@ -688,14 +795,7 @@ M.ensure_installed = function(callback)
 
   Logger.notify(string.format("%s. Downloading %s...", reason, required_version), Logger.LoggerLogLevels.info)
   M.install(required_version, function()
-    -- Verify the binary was successfully installed before calling the callback
-    if binary_exists() and version_matches() then
-      if Parser.is_up_to_date() then Api.trigger("ready") end
-      if callback then callback() end
-    else
-      Logger.error("Backend installation failed or binary is not accessible")
-      if callback then callback() end
-    end
+    finish_install(callback)
   end)
 end
 

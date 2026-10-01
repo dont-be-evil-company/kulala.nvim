@@ -1348,27 +1348,12 @@ local function execute_before_request(request)
   end
 end
 
----Parses and executes DocumentRequest/s:
----if requests is nil then it parses the current document
----if line_nr is nil then runs the first request in the list (used for replaying last request)
----if line_nr > 0 then runs the request from current buffer around the line number
----if line_nr is 0 then runs all or visually selected requests
 ---@param requests? DocumentRequest[]|nil
 ---@param line_nr? number|nil
 ---@param callback function
 ---@param run_opts? KulalaCoreRunOpts
-M.run_parser = function(requests, line_nr, callback, run_opts)
+local function run_parser(requests, line_nr, callback, run_opts)
   M.queue:reset()
-
-  if not KULALA_CORE.enabled() then
-    local msg = "kulala-core not found. "
-      .. "Either let kulala.nvim auto-download and install kulala-core or set `kulala_core.path` in setup."
-    local configured = CONFIG.get().kulala_core.path
-    if type(configured) == "string" and vim.trim(configured) ~= "" then
-      msg = ("kulala_core.path is not executable: %s"):format(vim.trim(configured))
-    end
-    return Logger.error(msg, 1, { report = true })
-  end
 
   if not requests then requests = DOCUMENT_PARSER.get_document() end
   if not requests then return end
@@ -1414,6 +1399,21 @@ M.run_parser = function(requests, line_nr, callback, run_opts)
   end
 
   M.queue:run_next()
+end
+
+---Parses and executes DocumentRequest/s:
+---if requests is nil then it parses the current document
+---if line_nr is nil then runs the first request in the list (used for replaying last request)
+---if line_nr > 0 then runs the request from current buffer around the line number
+---if line_nr is 0 then runs all or visually selected requests
+---@param requests? DocumentRequest[]|nil
+---@param line_nr? number|nil
+---@param callback function
+---@param run_opts? KulalaCoreRunOpts
+M.run_parser = function(requests, line_nr, callback, run_opts)
+  KULALA_CORE.guard(function()
+    run_parser(requests, line_nr, callback, run_opts)
+  end)
 end
 
 ---Deliver a single kulala-core result item (e.g. OpenAPI operation run) into the response UI.

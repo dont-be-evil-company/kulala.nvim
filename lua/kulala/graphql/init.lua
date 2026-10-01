@@ -32,41 +32,41 @@ local function graphql_host_at_cursor()
 end
 
 M.download_schema = function()
-  if not KULALA_CORE.enabled() then return Logger.error("kulala-core is required for GraphQL schema download") end
+  KULALA_CORE.guard(function()
+    local result, err = KULALA_CORE.graphql_introspect()
+    if not result then return Logger.error(err or "Failed to download GraphQL schema") end
+    if result.ok ~= true then return Logger.error(result.error or err or "Failed to download GraphQL schema") end
 
-  local result, err = KULALA_CORE.graphql_introspect()
-  if not result then return Logger.error(err or "Failed to download GraphQL schema") end
-  if result.ok ~= true then return Logger.error(result.error or err or "Failed to download GraphQL schema") end
-
-  local host = result.host or "unknown"
-  if result.fromCache then
-    Logger.info("GraphQL schema already cached for " .. host)
-  else
-    Logger.info("GraphQL schema downloaded and cached for " .. host)
-  end
+    local host = result.host or "unknown"
+    if result.fromCache then
+      Logger.info("GraphQL schema already cached for " .. host)
+    else
+      Logger.info("GraphQL schema downloaded and cached for " .. host)
+    end
+  end)
 end
 
 ---Clear cached GraphQL introspection schema(s).
 ---@param host string|nil Host cache key; when omitted uses host at cursor, else clears all.
 M.clear_schema_cache = function(host)
-  if not KULALA_CORE.enabled() then return Logger.error("kulala-core is required to clear GraphQL schema cache") end
+  KULALA_CORE.guard(function()
+    if not host or host == "" then host = graphql_host_at_cursor() end
 
-  if not host or host == "" then host = graphql_host_at_cursor() end
+    local ok, err, res = KULALA_CORE.clear_graphql_schema(host)
+    if not ok then return Logger.error(err or "Failed to clear GraphQL schema cache") end
 
-  local ok, err, res = KULALA_CORE.clear_graphql_schema(host)
-  if not ok then return Logger.error(err or "Failed to clear GraphQL schema cache") end
+    local cleared = (res and res.cleared) or 0
+    if cleared == 0 then
+      local label = host or "any host"
+      return Logger.info("No cached GraphQL schema for " .. label)
+    end
 
-  local cleared = (res and res.cleared) or 0
-  if cleared == 0 then
-    local label = host or "any host"
-    return Logger.info("No cached GraphQL schema for " .. label)
-  end
-
-  if host then
-    Logger.info("Cleared GraphQL schema cache for " .. host)
-  else
-    Logger.info("Cleared all GraphQL schema caches (" .. tostring(cleared) .. ")")
-  end
+    if host then
+      Logger.info("Cleared GraphQL schema cache for " .. host)
+    else
+      Logger.info("Cleared all GraphQL schema caches (" .. tostring(cleared) .. ")")
+    end
+  end)
 end
 
 return M

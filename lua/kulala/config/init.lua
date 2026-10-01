@@ -27,19 +27,49 @@ local function set_legacy_options()
   M.options = vim.tbl_deep_extend("keep", M.options, M.options.ui)
 end
 
+local function buffer_needs_backend(buf, ft)
+  if ft == "http" or ft == "rest" then return true end
+  local script_fts = { javascript = true, typescript = true, lua = true }
+  if not script_fts[ft] then return false end
+  return require("kulala.utils.fs").is_http_script_file(ft, buf)
+end
+
+local function start_lsp_if_ready(buf, ft)
+  if not (Parser.is_up_to_date() and Backend.is_up_to_date() and M.options.lsp.enable) then return end
+  if not vim.api.nvim_buf_is_valid(buf) then return end
+  require("kulala.cmd.lsp").start(buf, ft)
+end
+
+---Install kulala-core for an HTTP buffer, then start LSP.
+---Ordinary script buffers and a configured `kulala_core.path` do not download.
+---Skipped while Neovim is exiting so quit cannot block on the license prompt.
+---@param buf integer
+---@param ft? string
+function M.prepare_backend_for_buffer(buf, ft)
+  if vim.v.exiting ~= vim.NIL then return end
+  if not vim.api.nvim_buf_is_valid(buf) or not vim.api.nvim_buf_is_loaded(buf) then return end
+  ft = ft or vim.api.nvim_get_option_value("filetype", { buf = buf })
+  if not M.options.lsp.enable or not buffer_needs_backend(buf, ft) then return end
+
+  if Backend.is_up_to_date() then
+    start_lsp_if_ready(buf, ft)
+    return
+  end
+
+  local path = M.options.kulala_core.path
+  if type(path) == "string" and vim.trim(path) ~= "" then return end
+
+  Backend.ensure_installed(function()
+    start_lsp_if_ready(buf, ft)
+  end)
+end
+
 M.set_autocomands = function()
   vim.api.nvim_create_autocmd("FileType", {
     group = vim.api.nvim_create_augroup("Kulala filetype setup", { clear = true }),
     pattern = M.options.lsp.filetypes,
     callback = function(ev)
-      if not (Parser.is_up_to_date() and Backend.is_up_to_date() and M.options.lsp.enable) then return end
-
-      local ft = ev.match
-      local Fs = require("kulala.utils.fs")
-      local script_fts = { javascript = true, typescript = true, lua = true }
-      if script_fts[ft] and not Fs.is_http_script_file(ft, ev.buf) then return end
-
-      require("kulala.cmd.lsp").start(ev.buf, ft)
+      M.prepare_backend_for_buffer(ev.buf, ev.match)
     end,
   })
 end

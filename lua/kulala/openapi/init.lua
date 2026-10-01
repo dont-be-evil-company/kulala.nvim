@@ -4,22 +4,22 @@ local Logger = require("kulala.logger")
 local M = {}
 
 M.clear_schema_cache = function(cache_key)
-  if not KULALA_CORE.enabled() then return Logger.error("kulala-core is required to clear OpenAPI schema cache") end
+  KULALA_CORE.guard(function()
+    local ok, err, res = KULALA_CORE.clear_openapi_schema(cache_key)
+    if not ok then return Logger.error(err or "Failed to clear OpenAPI schema cache") end
 
-  local ok, err, res = KULALA_CORE.clear_openapi_schema(cache_key)
-  if not ok then return Logger.error(err or "Failed to clear OpenAPI schema cache") end
+    local cleared = (res and res.cleared) or 0
+    if cleared == 0 then
+      local label = cache_key or "any key"
+      return Logger.info("No cached OpenAPI schema for " .. label)
+    end
 
-  local cleared = (res and res.cleared) or 0
-  if cleared == 0 then
-    local label = cache_key or "any key"
-    return Logger.info("No cached OpenAPI schema for " .. label)
-  end
-
-  if cache_key then
-    Logger.info("Cleared OpenAPI schema cache for " .. cache_key)
-  else
-    Logger.info("Cleared all OpenAPI schema caches (" .. tostring(cleared) .. ")")
-  end
+    if cache_key then
+      Logger.info("Cleared OpenAPI schema cache for " .. cache_key)
+    else
+      Logger.info("Cleared all OpenAPI schema caches (" .. tostring(cleared) .. ")")
+    end
+  end)
 end
 
 ---@param bufnr? integer

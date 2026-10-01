@@ -210,21 +210,25 @@ local function refresh_environment_catalog_async(force, cwd, on_done)
     finish_catalog_load(cache_key, http_client_env, http_client_env_shared)
   end
 
-  if KULALA_CORE.enabled() then
-    KULALA_CORE.list_environments_async(cwd, function(catalog, err)
-      if err and not catalog then
+  local function load_catalog()
+    if KULALA_CORE.enabled() then
+      KULALA_CORE.list_environments_async(cwd, function(catalog, err)
+        if err and not catalog then
+          finish_with_disk()
+          if not catalog_cache.entries[cache_key] then Logger.warn(err) end
+          return
+        end
+        local http_client_env, http_client_env_shared = catalog_from_core(catalog)
+        finish_catalog_load(cache_key, http_client_env, http_client_env_shared)
+      end)
+    else
+      vim.schedule(function()
         finish_with_disk()
-        if not catalog_cache.entries[cache_key] then Logger.warn(err) end
-        return
-      end
-      local http_client_env, http_client_env_shared = catalog_from_core(catalog)
-      finish_catalog_load(cache_key, http_client_env, http_client_env_shared)
-    end)
-  else
-    vim.schedule(function()
-      finish_with_disk()
-    end)
+      end)
+    end
   end
+
+  KULALA_CORE.ensure(load_catalog)
 end
 
 ---@param cwd string|nil

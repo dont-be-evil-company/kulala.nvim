@@ -1,8 +1,6 @@
 local Augroups = require("kulala.augroups")
-local Backend = require("kulala.backend")
 local CONFIG = require("kulala.config")
 local Export = require("kulala.cmd.export")
-local Fs = require("kulala.utils.fs")
 local GLOBALS = require("kulala.globals")
 local Graphql = require("kulala.graphql")
 local KulalaCore = require("kulala.cmd.kulala_core_bridge")
@@ -14,16 +12,20 @@ local M = {}
 
 M.setup = function(config)
   CONFIG.setup(config)
-  local kulala_core_path = CONFIG.get().kulala_core.path
-  if kulala_core_path == nil or not Fs.file_exists(kulala_core_path) then
-    Backend.ensure_installed()
-    return
-  end
   Augroups.setup()
   -- Rerun lualine-setup,
   -- to have possible lazy-loaded `kulala` available
   local ok, lualine = pcall(require, "lualine")
   if ok and lualine then lualine.setup() end
+
+  -- FileType may already have fired for the buffer that loaded this plugin.
+  -- Install only for buffers that need kulala-core, and never while quitting.
+  vim.schedule(function()
+    if vim.v.exiting ~= vim.NIL then return end
+    for _, buf in ipairs(vim.api.nvim_list_bufs()) do
+      CONFIG.prepare_backend_for_buffer(buf)
+    end
+  end)
 end
 
 M.open = function()
@@ -88,14 +90,16 @@ M.search = function()
 end
 
 M.scripts_clear_global = function(key_or_keys)
-  local ok, err = KulalaCore.clear_globals(key_or_keys)
-  if not ok then
-    Logger.error(err or "Failed to clear global script variables", 1, { report = true })
-    return
-  end
-  local label = key_or_keys
-  if type(key_or_keys) == "table" then label = table.concat(key_or_keys, ", ") end
-  Logger.info("Cleared global variables: " .. (label or "all"))
+  KulalaCore.guard(function()
+    local ok, err = KulalaCore.clear_globals(key_or_keys)
+    if not ok then
+      Logger.error(err or "Failed to clear global script variables", 1, { report = true })
+      return
+    end
+    local label = key_or_keys
+    if type(key_or_keys) == "table" then label = table.concat(key_or_keys, ", ") end
+    Logger.info("Cleared global variables: " .. (label or "all"))
+  end)
 end
 
 M.download_graphql_schema = function()
@@ -107,14 +111,16 @@ M.clear_graphql_schema_cache = function(host)
 end
 
 M.open_openapi_explorer = function()
-  local res, err = Openapi.load_at_cursor()
-  if not res or not res.openapi then return Logger.error(err or "Failed to load OpenAPI spec") end
-  local DOCUMENT = require("kulala.parser.document")
-  local requests = DOCUMENT.get_document()
-  local line = vim.api.nvim_win_get_cursor(0)[1]
-  local at = DOCUMENT.get_request_at(requests, line)
-  local parent = at and at[1]
-  require("kulala.ui.openapi_panel").open(res.openapi, parent)
+  KulalaCore.guard(function()
+    local res, err = Openapi.load_at_cursor()
+    if not res or not res.openapi then return Logger.error(err or "Failed to load OpenAPI spec") end
+    local DOCUMENT = require("kulala.parser.document")
+    local requests = DOCUMENT.get_document()
+    local line = vim.api.nvim_win_get_cursor(0)[1]
+    local at = DOCUMENT.get_request_at(requests, line)
+    local parent = at and at[1]
+    require("kulala.ui.openapi_panel").open(res.openapi, parent)
+  end)
 end
 
 M.clear_openapi_schema_cache = function(cache_key)
@@ -142,7 +148,7 @@ end
 ---Clears all cached files
 ---Useful when you want to clear all cached files
 M.clear_cached_files = function()
-  Fs.delete_cached_files()
+  require("kulala.fs").delete_cached_files()
 end
 
 --- Exports current buffer|file|folder to Postman collection

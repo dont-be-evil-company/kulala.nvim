@@ -46,6 +46,33 @@ function M.require_enabled()
   )
 end
 
+---Download kulala-core when auto-install applies, then run `on_ready`.
+---A configured `kulala_core.path` is never downloaded. `on_ready` still runs
+---when the binary is already present, a path is configured, or Neovim is exiting.
+---@param on_ready fun()
+function M.ensure(on_ready)
+  if M.enabled() or configured_core_path() or vim.v.exiting ~= vim.NIL then
+    on_ready()
+    return
+  end
+  Backend.ensure_installed(on_ready)
+end
+
+---Run `on_ready` when kulala-core is usable.
+---A missing configured path is reported and `on_ready` is skipped.
+---A failed auto-install is already reported by the downloader.
+---@param on_ready fun()
+function M.guard(on_ready)
+  M.ensure(function()
+    if M.enabled() then
+      on_ready()
+      return
+    end
+    local configured = configured_core_path()
+    if configured then require("kulala.logger").error(("kulala_core.path is not executable: %s"):format(configured)) end
+  end)
+end
+
 ---Matches `packages/core/src/lib/runner/external-tools/paths.ts` (`getKulalaCoreDataDir`).
 ---@return string
 local function default_kulala_core_data_dir()

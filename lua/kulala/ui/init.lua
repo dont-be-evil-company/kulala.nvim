@@ -806,45 +806,49 @@ end
 M.copy = function()
   local Bridge = require("kulala.cmd.kulala_core_bridge")
 
-  if not Bridge.enabled() then return Logger.error("kulala-core is not available") end
+  Bridge.guard(function()
+    local curl, err = Bridge.to_curl_at_cursor(nil, GLOBALS.NAME .. "/" .. GLOBALS.VERSION)
+    if not curl then
+      if err and Bridge.is_preview_unsupported_err(err) then return Logger.warn(err) end
+      return Logger.error(err or "Failed to copy request as curl")
+    end
 
-  local curl, err = Bridge.to_curl_at_cursor(nil, GLOBALS.NAME .. "/" .. GLOBALS.VERSION)
-  if not curl then
-    if err and Bridge.is_preview_unsupported_err(err) then return Logger.warn(err) end
-    return Logger.error(err or "Failed to copy request as curl")
-  end
-
-  vim.fn.setreg("+", curl)
-  Logger.info("Copied to clipboard")
+    vim.fn.setreg("+", curl)
+    Logger.info("Copied to clipboard")
+  end)
 end
 
 M.from_curl = function()
   local clipboard = vim.fn.getreg("+")
   local Bridge = require("kulala.cmd.kulala_core_bridge")
-  local lines, err = Bridge.from_curl(clipboard)
-  if not lines then return Logger.error(err or "kulala-core from_curl failed") end
-  vim.api.nvim_put(lines, "l", false, false)
+  Bridge.guard(function()
+    local lines, err = Bridge.from_curl(clipboard)
+    if not lines then return Logger.error(err or "kulala-core from_curl failed") end
+    vim.api.nvim_put(lines, "l", false, false)
+  end)
 end
 
 M.inspect = function()
   local Bridge = require("kulala.cmd.kulala_core_bridge")
-  local content, err = Bridge.inspect_request_at_cursor()
-  if not content then
-    if err and Bridge.is_preview_unsupported_err(err) then return Logger.warn(err) end
-    return Logger.error(err or "kulala-core inspect_request failed")
-  end
+  Bridge.guard(function()
+    local content, err = Bridge.inspect_request_at_cursor()
+    if not content then
+      if err and Bridge.is_preview_unsupported_err(err) then return Logger.warn(err) end
+      return Logger.error(err or "kulala-core inspect_request failed")
+    end
 
-  if not content or #content == 0 then return end
+    if not content or #content == 0 then return end
 
-  Float.create(content, {
-    name = "kulala://inspect",
-    ft = "http",
-    relative = "cursor",
-    focusable = true,
-    border = "rounded",
-    auto_size = true,
-    close_keymaps = { "q", "<esc>" },
-  })
+    Float.create(content, {
+      name = "kulala://inspect",
+      ft = "http",
+      relative = "cursor",
+      focusable = true,
+      border = "rounded",
+      auto_size = true,
+      close_keymaps = { "q", "<esc>" },
+    })
+  end)
 end
 
 M.get_kulala_buffer = get_kulala_buffer

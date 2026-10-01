@@ -603,15 +603,16 @@ end
 local function yank_operation(state)
   local operation_key = operation_key_under_cursor(state)
   if not operation_key then return Logger.warn("Select an operation (or Try it out field) to yank as HTTP") end
-  if not KULALA_CORE.enabled() then return Logger.error("kulala-core is required to yank OpenAPI operations") end
 
-  local overrides = overrides_for_operation(state, operation_key)
-  local content, err = KULALA_CORE.openapi_to_http(state.http_bufnr, operation_key, state.parent_line, 1, overrides)
-  if not content then return Logger.error(err or "Failed to convert OpenAPI operation to HTTP") end
+  KULALA_CORE.guard(function()
+    local overrides = overrides_for_operation(state, operation_key)
+    local content, err = KULALA_CORE.openapi_to_http(state.http_bufnr, operation_key, state.parent_line, 1, overrides)
+    if not content then return Logger.error(err or "Failed to convert OpenAPI operation to HTTP") end
 
-  vim.fn.setreg("+", content)
-  vim.fn.setreg('"', content)
-  Logger.info("Copied HTTP request")
+    vim.fn.setreg("+", content)
+    vim.fn.setreg('"', content)
+    Logger.info("Copied HTTP request")
+  end)
 end
 
 local function apply_keymaps(state)
