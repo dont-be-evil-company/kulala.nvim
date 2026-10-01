@@ -29,8 +29,8 @@ title="init.lua"
           { "<leader>Rb", desc = "Open scratchpad" },
         },
         ft = { "http", "rest" },
-        -- Load before session save/restore hooks run
-        event = { "SessionLoadPost", "VimLeavePre" },
+        -- Load when a session is restored so the SessionLoadPost hook can run.
+        event = { "SessionLoadPost" },
         opts = {
           global_keymaps = false,
           global_keymaps_prefix = "<leader>R",

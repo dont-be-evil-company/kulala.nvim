@@ -1,6 +1,5 @@
 ---Shared markdown formatting for Kulala UI views.
 local Config = require("kulala.config")
-local Json = require("kulala.utils.json")
 
 local M = {}
 
@@ -187,14 +186,16 @@ end
 ---@return string
 function M.pretty_maybe_json(s)
   if not s or s == "" then return s end
-  local t = Json.parse(s, { verbose = false })
-  local response_format = Config.get().response_format
-  local config_indent = response_format.indent
-  local config_sort_keys = response_format.sort_keys
-  local expand_tabs = response_format.expand_tabs
-  local indent_chars = expand_tabs and "\t" or string.rep(" ", math.max(1, config_indent))
-  if t ~= nil then return vim.json.encode(t, { indent = indent_chars, sort_keys = config_sort_keys }) end
-  return s
+  local KULALA_CORE = require("kulala.cmd.kulala_core_bridge")
+  if not KULALA_CORE.enabled() then return s end
+  local response_format = Config.get().response_format or {}
+  local formatted = KULALA_CORE.format_json(nil, {
+    text = s,
+    indent = response_format.indent,
+    expand_tabs = response_format.expand_tabs,
+    sort_keys = response_format.sort_keys,
+  })
+  return formatted or s
 end
 
 ---@param lang string

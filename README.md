@@ -84,8 +84,8 @@ Via [lazy.nvim](https://github.com/folke/lazy.nvim):
 require("lazy").setup({
   {
     "dont-be-evil-company/kulala.nvim",
-    -- Load before session save/restore so VimLeavePre and SessionLoadPost hooks are registered.
-    event = { "SessionLoadPost", "VimLeavePre" },
+    -- Load when a session is restored so the SessionLoadPost hook can run.
+    event = { "SessionLoadPost" },
     keys = {
       { "<leader>Rs", desc = "Send request" },
       { "<leader>Ra", desc = "Send all requests" },

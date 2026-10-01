@@ -1,0 +1,34 @@
+# yaml-language-server: $schema=https://taskfile.dev/schema.json
+---
+version: '3'
+
+tasks:
+  default:
+    desc: Lists all available tasks
+    cmds:
+      - task --list
+    silent: true
+  install:deps:
+    desc: Installs all dependencies
+    cmds:
+      - pnpm install --frozen-lockfile
+    silent: true
+  fmt:
+    desc: Formats all files
+    aliases:
+      - format
+    cmds:
+      - stylua .
+    silent: true
+  lint:
+    desc: Runs lint on all files
+    aliases:
+      - check
+    cmds:
+      - ./scripts/lint.sh
+    silent: true
+  test:
+    desc: Runs tests
+    cmds:
+      - ./minitest.sh
+    silent: true

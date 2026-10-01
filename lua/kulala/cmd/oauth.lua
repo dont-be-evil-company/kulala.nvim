@@ -79,6 +79,27 @@ local function parse_variables(config, env)
   return config
 end
 
+local function oauth_cwd()
+  local KULALA_CORE = require("kulala.cmd.kulala_core_bridge")
+  local buf = DB.current_buffer or vim.api.nvim_get_current_buf()
+  local _, cwd = KULALA_CORE.resolve_document_paths(buf)
+  return cwd
+end
+
+---@param op "revoke"|"acquire"|"refresh"|"status"|"save"
+---@param config_id string
+---@param token table|nil
+---@return table|nil result
+---@return string|nil err
+local function core_oauth(op, config_id, token)
+  local KULALA_CORE = require("kulala.cmd.kulala_core_bridge")
+  return KULALA_CORE.oauth(op, {
+    env = Env.get_current_env(),
+    authId = config_id,
+    token = token,
+  }, oauth_cwd())
+end
+
 ---@return table - get the auth config for the current environment, under Security.Auth
 local function get_auth_config(config_id)
   local env = Async.co_wrap(co, function()
@@ -88,7 +109,13 @@ local function get_auth_config(config_id)
   local auth_config = vim.tbl_get(env, "Security", "Auth", config_id) or {}
   auth_config = parse_variables(auth_config, env)
 
-  auth_config.auth_data = auth_config.auth_data or {}
+  local res, err = core_oauth("status", config_id)
+  if not res then
+    Logger.error(err or "Failed to read auth token")
+    auth_config.auth_data = {}
+  else
+    auth_config.auth_data = res.token or {}
+  end
 
   return auth_config
 end
@@ -115,7 +142,8 @@ end
 ---@param replace boolean|nil - replace the existing auth data
 local function update_auth_data(config_id, data, replace)
   local auth_data = replace and data or vim.tbl_extend("force", get_auth_config(config_id).auth_data, data)
-  Async.co_wrap(co, Env.update_http_client_auth, config_id, auth_data)
+  local res, err = core_oauth("save", config_id, auth_data)
+  if not res then Logger.error(err or "Failed to save auth token") end
   return get_auth_config(config_id)
 end
 
@@ -541,59 +569,87 @@ M.acquire_password_token = function(config_id)
   return config.auth_data.access_token
 end
 
+---Finish a kulala-core acquire or refresh, including a browser-grant prompt.
+---@param config_id string
+---@param op "acquire"|"refresh"
+---@return table|nil token
+---@return string|nil err
+local function finish_core_oauth(config_id, op)
+  local res, err = core_oauth(op, config_id)
+  if not res then return nil, err end
+
+  if res.prompt == true then
+    if type(res.message) == "string" and res.message ~= "" then Logger.info(res.message) end
+    local inputs = require("kulala.cmd").collect_kulala_core_prompt_inputs(res)
+    if not inputs then return nil, "Prompt cancelled or incomplete" end
+
+    local KULALA_CORE = require("kulala.cmd.kulala_core_bridge")
+    local wrapper, cont_err = KULALA_CORE.continue({
+      promptId = res.promptId,
+      inputs = inputs,
+    }, oauth_cwd())
+    if cont_err then return nil, cont_err end
+
+    local first = wrapper and wrapper.data and wrapper.data[1]
+    if not first or first.success ~= true then return nil, (first and first.error) or "continue did not succeed" end
+
+    res, err = core_oauth("status", config_id)
+    if not res then return nil, err end
+  end
+
+  local token = res.token
+  if type(token) == "table" and (token.access_token or token.id_token) then return token end
+  return nil, "Failed to acquire token for config: " .. config_id
+end
+
+---Show progress while kulala-core acquires or refreshes a token.
+local function run_core_auth(config_id, op, ok_msg, err_msg)
+  local buf = DB.current_buffer
+  local progress = Float.create_progress_float("Acquiring auth data.  Press <C-c> to cancel.")
+  local KULALA_CORE = require("kulala.cmd.kulala_core_bridge")
+
+  if buf then
+    vim.keymap.set("n", "<C-c>", function()
+      progress.hide()
+      KULALA_CORE.interrupt_active()
+      Logger.info("Cancelling token acquisition for config: " .. config_id)
+      pcall(vim.keymap.del, "n", "<C-c>", { buffer = buf })
+    end, { buffer = buf, nowait = true })
+  end
+
+  local token, err = finish_core_oauth(config_id, op)
+
+  if buf then pcall(vim.keymap.del, "n", "<C-c>", { buffer = buf }) end
+  progress.hide()
+
+  if token then
+    Logger.info(ok_msg)
+    return token
+  end
+  Logger.error(err or err_msg)
+end
+
 ---Grant Type "Authorization Code" or "Implicit" or "Device Authorization" or "Client Credentials"
 ---Acquire a new token for the given config_id
 M.acquire_token = function(config_id)
   local config = get_auth_config(config_id)
 
+  if config["Grant Type"] ~= "Device Authorization" then
+    local token, err = finish_core_oauth(config_id, "acquire")
+    if not token then
+      if err then Logger.error(err) end
+      return
+    end
+    return token.access_token or token.id_token
+  end
+
   Table.remove_keys(
     config.auth_data,
     { "code", "device_code", "user_code", "access_token", "id_token", "refresh_token" }
   )
-  config = update_auth_data(config_id, config.auth_data, true)
+  update_auth_data(config_id, config.auth_data, true)
 
-  if config["Grant Type"] == "Device Authorization" then return M.acquire_device_token(config_id) end
-  if config["Grant Type"] == "Client Credentials" then return M.acquire_client_credentials(config_id) end
-  if config["Grant Type"] == "Password" then return M.acquire_password_token(config_id) end
-
-  local code = M.acquire_auth(config_id)
-  if config["Grant Type"] == "Implicit" then return code end
-
-  local required_params = { "Client ID", "Redirect URL", "Token URL" }
-  if not code or not validate_auth_params(config_id, required_params) then return end
-
-  local url = config["Token URL"]
-  local headers = get_custom_headers(config_id)
-  local body = "client_id="
-    .. config["Client ID"]
-    .. "&code="
-    .. code
-    .. "&redirect_uri="
-    .. config["Redirect URL"]
-    .. "&grant_type=authorization_code"
-
-  body = config["Client Secret"] and body .. "&client_secret=" .. config["Client Secret"] or body
-
-  body = add_pkce(config_id, body, "token")
-  body, headers = add_client_credentials(config_id, body, headers)
-  body = add_custom_params(config_id, body, "In Token Request")
-
-  Logger.info("Acquiring new token for config: " .. config_id)
-
-  local out = make_request(url, body, "acquire token", { headers = headers })
-  if not out then return end
-
-  Logger.debug("Token acquired for config: " .. config_id)
-  out.acquired_at = os.time()
-
-  if out.refresh_token then
-    out.refresh_token_acquired_at = os.time()
-    Logger.debug("Refresh Token acquired for config: " .. config_id)
-  end
-
-  config = update_auth_data(config_id, out)
-
-  return config.auth_data.access_token
+  return M.acquire_device_token(config_id)
 end
 
 ---Grant Type "Authorization Code" or "Device Authorization"
@@ -636,6 +692,7 @@ local function run_auth_async(config_id, fn)
       progress.hide()
       Logger.info("Cancelling token acquisition for config: " .. config_id)
 
+      require("kulala.cmd.kulala_core_bridge").interrupt_active()
       Async.co_resume(co)
       tcp_server = tcp_server and tcp_server:stop()
       exit = true
@@ -654,6 +711,20 @@ end
 
 M.refresh_token = function(config_id)
   local Cmd = require("kulala.cmd")
+  local config = get_auth_config(config_id)
+  if config["Grant Type"] ~= "Device Authorization" then
+    Cmd.queue:pause()
+    local token = finish_core_oauth(config_id, "refresh")
+    if token then
+      Cmd.queue:resume()
+    elseif Cmd.queue.previous_task then
+      vim.schedule(function()
+        Inlay.show(DB.current_buffer, "error", Inlay.icon_line_for_request(Cmd.queue.previous_task.data.request))
+      end)
+    end
+    return token and (token.access_token or token.id_token)
+  end
+
   Cmd.queue:pause()
 
   run_auth_async(config_id, function()
@@ -668,23 +739,45 @@ M.refresh_token = function(config_id)
 end
 
 M.refresh_token_manually = function(config_id)
-  run_auth_async(config_id, function()
-    if refresh_token_co(config_id) then
-      Logger.info("Token refreshed for config: " .. config_id)
-    else
-      Logger.error("Failed to refresh token for config: " .. config_id)
-    end
-  end)
+  local config = get_auth_config(config_id)
+  if config["Grant Type"] == "Device Authorization" then
+    run_auth_async(config_id, function()
+      if refresh_token_co(config_id) then
+        Logger.info("Token refreshed for config: " .. config_id)
+      else
+        Logger.error("Failed to refresh token for config: " .. config_id)
+      end
+    end)
+    return
+  end
+
+  run_core_auth(
+    config_id,
+    "refresh",
+    "Token refreshed for config: " .. config_id,
+    "Failed to refresh token for config: " .. config_id
+  )
 end
 
 M.acquire_token_manually = function(config_id)
-  run_auth_async(config_id, function()
-    if M.acquire_token(config_id) then
-      Logger.info("Token acquired for config: " .. config_id)
-    else
-      Logger.error("Failed to acquire token for config: " .. config_id)
-    end
-  end)
+  local config = get_auth_config(config_id)
+  if config["Grant Type"] == "Device Authorization" then
+    run_auth_async(config_id, function()
+      if M.acquire_token(config_id) then
+        Logger.info("Token acquired for config: " .. config_id)
+      else
+        Logger.error("Failed to acquire token for config: " .. config_id)
+      end
+    end)
+    return
+  end
+
+  run_core_auth(
+    config_id,
+    "acquire",
+    "Token acquired for config: " .. config_id,
+    "Failed to acquire token for config: " .. config_id
+  )
 end
 
 ---Grant Type - all
@@ -695,8 +788,6 @@ M.get_token = function(type, config_id)
   local config = get_auth_config(config_id)
 
   local token_type = (type == "idToken" or config["Use ID Token"]) and "id_token" or "access_token"
-  token_type = config["Grant Type"] == "Implicit" and "code" or token_type
-
   local token = not M.is_token_expired(config_id) and config.auth_data[token_type]
 
   if config["Acquire Automatically"] == false then
@@ -704,69 +795,47 @@ M.get_token = function(type, config_id)
       or Logger.info("`Acquire Automatically = false`\nNo valid access/refresh token for config: " .. config_id)
   end
 
-  if not token then M.refresh_token(config_id) end
+  if token then return token end
 
-  return config.auth_data[token_type]
+  if config["Grant Type"] == "Device Authorization" then
+    M.refresh_token(config_id)
+    return get_auth_config(config_id).auth_data[token_type]
+  end
+
+  local refreshed, err = finish_core_oauth(config_id, "refresh")
+  if not refreshed then return Logger.error(err or "Failed to acquire token for config: " .. config_id) end
+  return refreshed[token_type]
 end
 
 ---Revoke the token for the given config_id
 M.revoke_token = function(config_id)
-  local config = get_auth_config(config_id)
-
-  local token = config.auth_data.access_token
-  if not token then return Logger.info("No token to revoke for config: " .. config_id) end
-
-  local body = "token="
-    .. config.auth_data.access_token
-    .. "&client_id="
-    .. config["Client ID"]
-    .. "&client_secret="
-    .. config["Client Secret"]
-
-  Logger.info("Revoking token for config: " .. config_id)
-
-  if validate_auth_params(config_id, { "Revoke URL" }) then
-    co = coroutine.create(function()
-      if make_request(config["Revoke URL"], body, "revoke token") then
-        Logger.info("Token revoked for config: " .. config_id)
-      end
-    end)
-
-    Async.co_resume(co)
+  local res, err = core_oauth("revoke", config_id)
+  if not res then return Logger.error(err or "Failed to revoke token") end
+  if res.cleared ~= true then return Logger.info(res.message or ("No token to revoke for config: " .. config_id)) end
+  if res.revokeError then
+    Logger.warn(res.revokeError)
+    return Logger.info("Removed cached token for config: " .. config_id)
   end
-
-  Table.remove_keys(config.auth_data, {
-    "code",
-    "pkce_verifier",
-    "access_token",
-    "id_token",
-    "refresh_token",
-    "acquired_at",
-    "expires_in",
-    "refresh_token_acquired_at",
-    "refresh_token_expires_in",
-  })
-  update_auth_data(config_id, config.auth_data, true)
+  Logger.info("Token revoked for config: " .. config_id)
 end
 
 ---Check if the token for the given config_id is expired
 ---@param config_id string
----@param type string|nil - default: "access" | "refresh"
+---@param type string|nil - default: access | "refresh_token"
 M.is_token_expired = function(config_id, type)
-  type = type and type .. "_" or ""
-  local config = get_auth_config(config_id).auth_data
-
-  local acquired_at = tonumber(config[type .. "acquired_at"])
-  local expires_in = tonumber(config[type .. "expires_in"])
-
-  if not acquired_at or not expires_in then return true end
-
-  local diff = os.difftime(os.time(), acquired_at)
-  if diff > expires_in then
-    Logger.warn((type == "" and "Access" or "Refresh") .. " token expired for config: " .. config_id)
+  local res, err = core_oauth("status", config_id)
+  if not res then
+    Logger.error(err or "Failed to read auth token")
+    return true
   end
 
-  return diff > expires_in, expires_in - diff
+  local token = res.token or {}
+  if type == "refresh_token" then return not token.refresh_token end
+
+  if res.hasToken and res.expired then Logger.warn("Access token expired for config: " .. config_id) end
+  local expires_at = tonumber(res.expiresAt)
+  local remaining = expires_at and (expires_at - os.time()) or nil
+  return res.expired == true, remaining
 end
 
 M.auth_template = function()

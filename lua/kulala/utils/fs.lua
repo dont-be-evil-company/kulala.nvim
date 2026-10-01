@@ -399,8 +399,18 @@ M.write_json = function(filename, data, format_opts)
   if not content then return end
 
   if format_opts then
-    local indent = format_opts.indent or 2
-    content = vim.json.encode(data, { indent = indent }) or content
+    local response_format = require("kulala.config").get().response_format or {}
+    local KULALA_CORE = require("kulala.cmd.kulala_core_bridge")
+    if KULALA_CORE.enabled() then
+      local expand_tabs = format_opts.expand_tabs
+      if type(expand_tabs) ~= "boolean" then expand_tabs = response_format.expand_tabs end
+      local formatted = KULALA_CORE.format_json(data, {
+        indent = format_opts.indent or response_format.indent,
+        expand_tabs = expand_tabs,
+        sort_keys = format_opts.sort or format_opts.sort_keys or response_format.sort_keys,
+      })
+      if type(formatted) == "string" then content = formatted end
+    end
   end
 
   return M.write_file(filename, content)

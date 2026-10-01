@@ -20,6 +20,7 @@ trap cleanup EXIT
   echo
   echo "set -eo pipefail"
   echo
+  echo export KULALA_CORE_LICENSE_TOKEN="$KULALA_CORE_LICENSE_TOKEN"
   echo "nvim --headless -i NONE --noplugin -u \"$TMP_DIR/minitest.lua\""
 } > "$TMP_DIR/minitest.sh"
 
@@ -36,6 +37,8 @@ chmod +x "$TMP_DIR/minitest.sh"
   echo
 } > "$TMP_DIR/minitest.lua"
 cat minitest.lua >> "$TMP_DIR/minitest.lua"
+echo "Running tests in isolation..."
+echo "Temporary directory: $TMP_DIR"
 
 "$TMP_DIR/minitest.sh"
 

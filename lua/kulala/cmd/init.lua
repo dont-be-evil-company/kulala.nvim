@@ -674,9 +674,17 @@ end
 ---@return string
 local function kulala_core_body_text(body)
   if type(body) == "table" and body.type == "json" then
-    if type(body.formatted) == "string" then return body.formatted end
-    local encoded = vim.json.encode(body.content)
-    return encoded or vim.inspect(body.content)
+    if type(body.formatted) == "string" and body.formatted ~= "" then return body.formatted end
+    if body.content ~= nil and KULALA_CORE.enabled() then
+      local fmt = CONFIG.get().response_format or {}
+      local formatted = KULALA_CORE.format_json(body.content, {
+        indent = fmt.indent,
+        expand_tabs = fmt.expand_tabs,
+        sort_keys = fmt.sort_keys,
+      })
+      if type(formatted) == "string" then return formatted end
+    end
+    return vim.inspect(body.content)
   end
   if type(body) == "table" and body.type == "text" then return body.content or "" end
   if type(body) == "table" and body.type == "binary" then return binary_body_note(body) end
@@ -875,6 +883,9 @@ local function kulala_core_collect_prompt_inputs(prompt)
   end
   return out
 end
+
+---Collect inputs for a kulala-core OAuth or `@kulala-prompt` payload.
+M.collect_kulala_core_prompt_inputs = kulala_core_collect_prompt_inputs
 
 ---@param requests DocumentRequest[]
 ---@return table[]|nil limit kulala-core run limit (name filters), or nil when empty

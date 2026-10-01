@@ -110,6 +110,7 @@ local commands = {
   e = { edit_env_file, "Edit Auth configuration" },
   p = { edit_private_env_file, "Edit private Auth configuration" },
   m = { remove_config, "Remove Auth configuration" },
+  -- Token acquire, refresh, and revoke go through kulala-core.
   g = { Oauth.acquire_token_manually, "Get new token" },
   f = { Oauth.refresh_token_manually, "Refresh token" },
   r = { Oauth.revoke_token, "Revoke token" },

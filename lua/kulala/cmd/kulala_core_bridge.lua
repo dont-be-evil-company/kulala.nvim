@@ -225,7 +225,7 @@ end
 ---@param payload table
 ---@param cwd string|nil
 ---@param on_done fun(job: vim.SystemCompleted)
----@param hooks? { on_http_stream?: fun(event: table) }
+---@param hooks? { on_http_stream?: fun(event: table), timeout_ms?: number }
 function M.invoke_async(payload, cwd, on_done, hooks)
   local exe = M.require_enabled()
   hooks = hooks or {}
@@ -236,8 +236,9 @@ function M.invoke_async(payload, cwd, on_done, hooks)
     env = env_with_data_dir(),
   }
   if not keep_alive then
-    local timeout_ms = invoke_timeout_ms()
-    if timeout_ms then opts.timeout = timeout_ms end
+    local timeout_ms = hooks.timeout_ms
+    if timeout_ms == nil then timeout_ms = invoke_timeout_ms() end
+    if timeout_ms and timeout_ms > 0 then opts.timeout = timeout_ms end
   end
   if type(cwd) == "string" and cwd ~= "" and vim.fn.isdirectory(cwd) == 1 then opts.cwd = cwd end
 
@@ -304,15 +305,16 @@ end
 
 ---@param payload table
 ---@param cwd string|nil
+---@param hooks? { timeout_ms?: number }
 ---@return vim.SystemCompleted
-function M.invoke(payload, cwd)
+function M.invoke(payload, cwd, hooks)
   local done = false
   local completed ---@type vim.SystemCompleted
   M.invoke_async(payload, cwd, function(job)
     completed = job
     done = true
-  end)
-  local wait_ms = invoke_timeout_ms() or 600000
+  end, hooks)
+  local wait_ms = (hooks and hooks.timeout_ms) or invoke_timeout_ms() or 600000
   if payload_keep_alive(payload) then wait_ms = 24 * 60 * 60 * 1000 end
   vim.wait(wait_ms, function()
     return done
@@ -546,12 +548,78 @@ function M.crypto(op, args, cwd)
   return nil, "invalid kulala-core crypto output"
 end
 
+---Browser grants can wait on a local redirect server for up to five minutes.
+local OAUTH_BROWSER_TIMEOUT_MS = 300000
+
+---@param op "revoke"|"acquire"|"refresh"|"status"|"save"
+---@param args { env?: string, authId: string, token?: table }|nil
+---@param cwd string|nil
+---@return table|nil result
+---@return string|nil err
+function M.oauth(op, args, cwd)
+  M.require_enabled()
+  args = args or {}
+  local payload = {
+    action = "oauth",
+    op = op,
+    cwd = cwd,
+    env = args.env,
+    authId = args.authId,
+    token = args.token,
+  }
+  local hooks = nil
+  if op == "acquire" or op == "refresh" then hooks = { timeout_ms = OAUTH_BROWSER_TIMEOUT_MS } end
+  local job = M.invoke(payload, cwd, hooks)
+  local res, err = decode_job_stdout(job)
+  if not res then return nil, err end
+  if res.prompt == true then return res, nil end
+  if res.success == false then return nil, res.error or "kulala-core oauth failed" end
+  return res, nil
+end
+
+---@param value any
+---@param opts { text?: string, indent?: number, expand_tabs?: boolean, sort_keys?: boolean, cwd?: string }|nil
+---@return string|nil content
+---@return string|nil err
+function M.format_json(value, opts)
+  M.require_enabled()
+  opts = opts or {}
+  local payload = {
+    action = "format_json",
+    indent = opts.indent,
+    expand_tabs = opts.expand_tabs,
+    sort_keys = opts.sort_keys,
+  }
+  if opts.text ~= nil then
+    payload.text = opts.text
+  else
+    payload.value = value
+  end
+  local job = M.invoke(payload, opts.cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.success == true and type(res.content) == "string" then return res.content, nil end
+  if res and res.error then return nil, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core format_json failed"
+  end
+  return nil, "invalid kulala-core format_json output"
+end
+
 ---@param body table|string|nil
 ---@return string
 local function response_body_text(body)
   if type(body) == "table" and body.type == "json" then
-    if type(body.formatted) == "string" then return body.formatted end
-    return vim.json.encode(body.content) or ""
+    if type(body.formatted) == "string" and body.formatted ~= "" then return body.formatted end
+    if body.content ~= nil then
+      local fmt = require("kulala.config").get().response_format or {}
+      local ok, formatted = pcall(M.format_json, body.content, {
+        indent = fmt.indent,
+        expand_tabs = fmt.expand_tabs,
+        sort_keys = fmt.sort_keys,
+      })
+      if ok and type(formatted) == "string" then return formatted end
+    end
+    return vim.inspect(body.content)
   end
   if type(body) == "table" and body.type == "text" then return body.content or "" end
   if type(body) == "table" and body.type == "binary" then

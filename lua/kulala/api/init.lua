@@ -15,6 +15,11 @@ end
 
 M.on = function(name, callback)
   if not M.events[name] then return Logger.error("Invalid event name: " .. name) end
+  -- `ready` is one-shot. A listener added after it fired still runs.
+  if name == "ready" and ready_triggered then
+    callback()
+    return
+  end
   table.insert(M.events[name], callback)
 end
 
