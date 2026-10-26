@@ -214,9 +214,12 @@ function M.parse_http_stream_line(line)
   return value
 end
 
----Stop the in-flight kulala-core subprocess (e.g. Ctrl+C interrupt).
+---Stop the in-flight kulala-core request. A daemon call is cancelled in place.
+---A one-shot fallback process is stopped with SIGTERM.
 ---@return boolean stopped
 function M.interrupt_active()
+  local Daemon = require("kulala.cmd.kulala_core_daemon")
+  if Daemon.cancel_active() then return true end
   local job = M.active_job
   if not job then return false end
   M.active_job = nil
@@ -230,7 +233,7 @@ end
 ---@param cwd string|nil
 ---@param on_done fun(job: vim.SystemCompleted)
 ---@param hooks? { on_http_stream?: fun(event: table), timeout_ms?: number, track?: "active"|"search"|"none" }
-function M.invoke_async(payload, cwd, on_done, hooks)
+local function invoke_oneshot(payload, cwd, on_done, hooks)
   local exe = M.require_enabled()
   hooks = hooks or {}
   local track = hooks.track or "active"
@@ -335,6 +338,36 @@ end
 
 ---@param payload table
 ---@param cwd string|nil
+---@param on_done fun(job: vim.SystemCompleted)
+---@param hooks? { on_http_stream?: fun(event: table), timeout_ms?: number, track?: "active"|"search"|"none" }
+function M.invoke_async(payload, cwd, on_done, hooks)
+  local exe = M.require_enabled()
+  hooks = hooks or {}
+  local timeout_ms = nil
+  if not payload_keep_alive(payload) then
+    timeout_ms = hooks.timeout_ms
+    if timeout_ms == nil then timeout_ms = invoke_timeout_ms() end
+  end
+  require("kulala.cmd.kulala_core_daemon").request(
+    {
+      exe = exe,
+      data_dir = M.effective_data_dir(),
+      env = env_with_data_dir(),
+      payload = payload,
+      cwd = cwd,
+      timeout_ms = timeout_ms,
+      track = hooks.track or "active",
+      on_http_stream = hooks.on_http_stream,
+    },
+    on_done,
+    function()
+      invoke_oneshot(payload, cwd, on_done, hooks)
+    end
+  )
+end
+
+---@param payload table
+---@param cwd string|nil
 ---@param hooks? { timeout_ms?: number, track?: "active"|"search"|"none" }
 ---@return vim.SystemCompleted
 function M.invoke(payload, cwd, hooks)
@@ -349,12 +382,15 @@ function M.invoke(payload, cwd, hooks)
   vim.wait(wait_ms, function()
     return done
   end, 20)
-  if not done and hooks and hooks.track == "search" and M.search_job then
-    local job = M.search_job
-    M.search_job = nil
-    pcall(function()
-      job:kill("sigterm")
-    end)
+  if not done and hooks and hooks.track == "search" then
+    require("kulala.cmd.kulala_core_daemon").cancel_search()
+    if M.search_job then
+      local job = M.search_job
+      M.search_job = nil
+      pcall(function()
+        job:kill("sigterm")
+      end)
+    end
   end
   return completed or { code = 124, stdout = "", stderr = "kulala-core subprocess timed out" }
 end
@@ -1441,7 +1477,6 @@ function M.websocket_start(opts, handlers, cwd)
   local exe = M.executable_path()
   if not exe then return nil end
 
-  local tmp = vim.fn.tempname() .. ".json"
   local payload = {
     url = opts.url,
     headers = opts.headers,
@@ -1452,16 +1487,15 @@ function M.websocket_start(opts, handlers, cwd)
   else
     payload.body = opts.body
   end
-  vim.fn.writefile({ vim.json.encode(payload) }, tmp)
 
-  return vim.system({ exe, "--websocket", "-i", tmp }, {
-    stdin = true,
-    text = true,
-    cwd = cwd,
-    env = env_with_data_dir(),
-    stdout = handlers.on_stdout,
-    stderr = handlers.on_stderr,
-  }, handlers.on_exit)
+  return require("kulala.cmd.kulala_core_daemon").open_websocket(
+    exe,
+    M.effective_data_dir(),
+    env_with_data_dir(),
+    payload,
+    handlers,
+    cwd
+  )
 end
 
 ---@param err string|nil
