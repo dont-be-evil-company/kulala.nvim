@@ -1,9 +1,9 @@
 local sha256digests = {}
 
-sha256digests["kulala-core-darwin-arm64"] = "aabd161352420d64aac743a7ce196818a0373ec108b3e79c4ce8b436f6022ce6"
-sha256digests["kulala-core-darwin-x86_64"] = "d918db7a987043d1fed367581537a0d442bab9ba1ff2866886980f25babf2c96"
-sha256digests["kulala-core-linux-aarch64"] = "6b2e7255a3affd9eeb0280be7bbc04ca8b5f520f041493c2a35a099e00ede67c"
-sha256digests["kulala-core-linux-x86_64"] = "935a06c9982d6e9af539029c9ab55e6babc86249dd74414c1ecef41c3ce2d00f"
-sha256digests["kulala-core-windows-x86_64.exe"] = "c4682834c5373a3a6cdc1936e7af0a42c56c09f3abe9c35a8524f693d4dd7492"
+sha256digests["kulala-core-darwin-arm64"] = "8b824af60b2801751e3f10764c20aabcdaa201a2b6b86f78300e8101368e8ec2"
+sha256digests["kulala-core-darwin-x86_64"] = "af3b7cc94501cc31c06152cdc899d6440ef79dc2aa230b35978dc4be5c6444e9"
+sha256digests["kulala-core-linux-aarch64"] = "2b6d567ff77ffea69384a9c86992ea4ecea04970acd2075a5408227ca04d329b"
+sha256digests["kulala-core-linux-x86_64"] = "cd7e7b511462c03fad53d4c418feb4740ef00e8883c9fcbca20e1e37f0f4b01c"
+sha256digests["kulala-core-windows-x86_64.exe"] = "feb395f5d47b2964335cf9004cf12fe5040d06ba71ad22829bea0800e1a37e43"
 
 return sha256digests

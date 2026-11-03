@@ -9,6 +9,7 @@ Table of Contents             *kulala.configuration-options-table-of-contents*
   - Keymaps       |kulala.configuration-options-configuration-options-keymaps|
   - Script console notify |kulala.configuration-options-configuration-options-script-console-notify|
   - OpenAPI panel |kulala.configuration-options-configuration-options-openapi-panel|
+  - GraphQL panel |kulala.configuration-options-configuration-options-graphql-panel|
 
 ==============================================================================
 1. Configuration Options  *kulala.configuration-options-configuration-options*
@@ -67,6 +68,11 @@ See `lua/kulala/config/defaults.lua` for the complete default table. Example
       script_console_notify = true,
       openapi_panel_keymaps = true,
       openapi_panel = {
+        split = "right",
+        signs = { folded = ">", expanded = "v" },
+      },
+      graphql_panel_keymaps = true,
+      graphql_panel = {
         split = "right",
         signs = { folded = ">", expanded = "v" },
       },
@@ -1120,5 +1126,40 @@ Example:
       },
     }
 <
+
+GRAPHQL_PANEL       *kulala.configuration-options-configuration-options-graphql-panel*
+
+Options for the GraphQL explorer split buffer. See |kulala.graphql-graphql-explorer|.
+
+>lua
+    graphql_panel = {
+      split = "right",
+      signs = { folded = ">", expanded = "v" },
+      highlights = {
+        root = "Title",
+        field = "Function",
+        arg = "Identifier",
+        type = "Type",
+        badge = "Special",
+        description = "Comment",
+        checked = "String",
+        header = "Comment",
+        value = "Constant",
+      },
+    }
+<
+
+`win_opts` from `ui.win_opts` is merged when opening the explorer window.
+
+
+GRAPHQL_PANEL_KEYMAPS
+
+Set to `true` to enable default keymaps in the GraphQL explorer buffer.
+
+Check |kulala.keymaps-keymaps-graphql-panel-keymaps| and
+|kulala.default-keymaps.txt| for details.
+
+Default: `true`
+
 
 vim:tw=78:ts=8:noet:ft=help:norl:

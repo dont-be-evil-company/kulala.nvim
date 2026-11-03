@@ -210,7 +210,8 @@ local function open_kulala_window(buf)
   if win then return win end
 
   local OPENAPI_PANEL = require("kulala.ui.openapi_panel")
-  local explorer_win = OPENAPI_PANEL.get_window()
+  local GRAPHQL_PANEL = require("kulala.ui.graphql_explorer")
+  local explorer_win = OPENAPI_PANEL.get_window() or GRAPHQL_PANEL.get_window()
   local request_win = explorer_win and vim.api.nvim_win_is_valid(explorer_win) and explorer_win
     or vim.fn.win_findbuf(DB.get_current_buffer())[1]
     or vim.api.nvim_get_current_win()
@@ -711,6 +712,8 @@ M.open_default_view = function()
 end
 
 M.open = function()
+  local graphql = require("kulala.ui.graphql_explorer")
+  if graphql.composing() then return graphql.run() end
   M:open_all(vim.api.nvim_get_mode().mode == "V" and 0 or get_current_line())
 end
 

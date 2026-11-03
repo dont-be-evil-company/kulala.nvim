@@ -7,6 +7,7 @@ Table of Contents                           *kulala.keymaps-table-of-contents*
   - Global Keymaps                     |kulala.keymaps-keymaps-global-keymaps|
   - Kulala Keymaps                     |kulala.keymaps-keymaps-kulala-keymaps|
   - OpenAPI panel keymaps   |kulala.keymaps-keymaps-openapi-panel-keymaps|
+  - GraphQL panel keymaps   |kulala.keymaps-keymaps-graphql-panel-keymaps|
 
 ==============================================================================
 1. Keymaps                                            *kulala.keymaps-keymaps*
@@ -98,6 +99,27 @@ CUSTOM OPENAPI PANEL KEYMAPS
       openapi_panel_keymaps = {
         ["Run"] = { "<CR>", function() require("kulala.ui.openapi_panel").run() end },
         ["Refresh"] = false, -- disable refresh on `R`
+      },
+    }
+<
+
+
+GRAPHQL PANEL KEYMAPS       *kulala.keymaps-keymaps-graphql-panel-keymaps*
+
+Set to `true` to enable default keymaps in the GraphQL explorer buffer
+(`kulala://graphql-explorer`). Override individual mappings the same way as
+|kulala.keymaps-keymaps-kulala-keymaps|.
+
+Default is `true`. See |kulala.default-keymaps.txt| for the default bindings.
+
+
+CUSTOM GRAPHQL PANEL KEYMAPS
+
+>lua
+    {
+      graphql_panel_keymaps = {
+        ["Toggle field"] = { "<Space>", function() require("kulala.ui.graphql_explorer").toggle() end },
+        ["Refresh"] = false,
       },
     }
 <

@@ -1117,6 +1117,116 @@ function M.clear_openapi_schema(cache_key)
   return false, "invalid kulala-core clear_openapi_schema output", nil
 end
 
+---Load the GraphQL explorer schema and current selection for the block at cursor.
+---@param bufnr? integer
+---@param line? integer 1-based line (defaults to cursor)
+---@param column? integer 1-based column
+---@return table|nil result { ok, graphql? }
+---@return string|nil err
+function M.graphql_explorer_load(bufnr, line, column)
+  M.require_enabled()
+  local payload, cwd = cursor_request_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  if type(line) == "number" then payload.line = line end
+  if type(column) == "number" then payload.column = column end
+  payload.action = "graphql_explorer_load"
+  payload.env = require("kulala.parser.env").get_current_env() or "default"
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.ok == true and type(res.graphql) == "table" then return res, nil end
+  if res and res.error then return res, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_load failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_load output"
+end
+
+---Apply one GraphQL explorer edit and return the patched body.
+---@param bufnr? integer
+---@param line? integer
+---@param column? integer
+---@param edit table
+---@return table|nil result
+---@return string|nil err
+function M.graphql_explorer_patch(bufnr, line, column, edit)
+  M.require_enabled()
+  local payload, cwd = cursor_request_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  if type(line) == "number" then payload.line = line end
+  if type(column) == "number" then payload.column = column end
+  payload.action = "graphql_explorer_patch"
+  payload.edit = edit
+  payload.env = require("kulala.parser.env").get_current_env() or "default"
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.ok == true then return res, nil end
+  if res and res.error then return res, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_patch failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_patch output"
+end
+
+---Run the GraphQL request with explorer operators removed.
+---@param bufnr? integer
+---@param line? integer
+---@param column? integer
+---@return table|nil item
+---@return string|nil err
+function M.graphql_explorer_run(bufnr, line, column)
+  M.require_enabled()
+  local payload, cwd = buffer_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  payload.action = "graphql_explorer_run"
+  payload.env = require("kulala.parser.env").get_current_env() or "default"
+  if type(line) == "number" then
+    payload.line = line
+    payload.column = column or 1
+  else
+    local pos = vim.api.nvim_win_get_cursor(0)
+    payload.line = pos[1]
+    payload.column = pos[2]
+  end
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and (res.success == true or res.success == false) then return res, nil end
+  if res and res.error then return res, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_run failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_run output"
+end
+
+---Serialize the explorer block without the explorer operators.
+---@param bufnr? integer
+---@param line? integer
+---@param column? integer
+---@return string|nil content
+---@return string|nil err
+function M.graphql_explorer_to_http(bufnr, line, column)
+  M.require_enabled()
+  local payload, cwd = buffer_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  payload.action = "graphql_explorer_to_http"
+  if type(line) == "number" then
+    payload.line = line
+    payload.column = column or 1
+  else
+    local pos = vim.api.nvim_win_get_cursor(0)
+    payload.line = pos[1]
+    payload.column = pos[2]
+  end
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.ok == true and type(res.content) == "string" then return res.content, nil end
+  if res and res.error then return nil, res.error end
+  if job.code ~= 0 then
+    return nil,
+      vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_to_http failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_to_http output"
+end
+
 ---Load OpenAPI spec and return explorer tree for block at cursor.
 ---@param bufnr? integer
 ---@param line? integer 1-based line (defaults to cursor)

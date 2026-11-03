@@ -114,6 +114,19 @@ M.clear_graphql_schema_cache = function(host)
   Graphql.clear_schema_cache(host)
 end
 
+M.open_graphql_explorer = function()
+  KulalaCore.guard(function()
+    local res, err = KulalaCore.graphql_explorer_load()
+    if not res or not res.graphql then return Logger.error(err or "Failed to load GraphQL schema") end
+    local DOCUMENT = require("kulala.parser.document")
+    local requests = DOCUMENT.get_document()
+    local line = vim.api.nvim_win_get_cursor(0)[1]
+    local at = DOCUMENT.get_request_at(requests, line)
+    local parent = at and at[1]
+    require("kulala.ui.graphql_explorer").open(res.graphql, parent)
+  end)
+end
+
 M.open_openapi_explorer = function()
   KulalaCore.guard(function()
     local res, err = Openapi.load_at_cursor()

@@ -356,6 +356,66 @@ M.default_openapi_panel_keymaps = {
   },
 }
 
+M.default_graphql_panel_keymaps = {
+  ["Toggle fold"] = {
+    "<Tab>",
+    function()
+      require("kulala.ui.graphql_explorer").toggle_fold()
+    end,
+  },
+  ["Toggle fold (za)"] = {
+    "za",
+    function()
+      require("kulala.ui.graphql_explorer").toggle_fold()
+    end,
+    prefix = false,
+  },
+  ["Toggle field"] = {
+    "<Space>",
+    function()
+      require("kulala.ui.graphql_explorer").toggle()
+    end,
+  },
+  ["Run"] = {
+    "<CR>",
+    function()
+      require("kulala.ui.graphql_explorer").run()
+    end,
+    prefix = false,
+  },
+  ["Edit argument"] = {
+    "e",
+    function()
+      require("kulala.ui.graphql_explorer").edit()
+    end,
+  },
+  ["Search"] = {
+    "/",
+    function()
+      require("kulala.ui.graphql_explorer").search()
+    end,
+  },
+  ["Yank as HTTP"] = {
+    "Y",
+    function()
+      require("kulala.ui.graphql_explorer").yank()
+    end,
+    prefix = false,
+  },
+  ["Refresh"] = {
+    "R",
+    function()
+      require("kulala.ui.graphql_explorer").refresh()
+    end,
+  },
+  ["Close"] = {
+    "q",
+    function()
+      require("kulala.ui.graphql_explorer").close()
+    end,
+  },
+}
+
 M.default_lsp_keymaps = {
   ["<leader>ls"] = { vim.lsp.buf.document_symbol, desc = "Search Symbols" },
   ["<leader>lv"] = {
@@ -503,6 +563,60 @@ M.get_openapi_panel_keymaps = function()
     or default_keymaps
 
   return config_keymaps
+end
+
+M.get_graphql_panel_keymaps = function()
+  local config = require("kulala.config")
+  local config_keymaps = config.options.graphql_panel_keymaps
+
+  if config_keymaps == nil then return end
+  if config_keymaps == false then return end
+
+  local default_keymaps = vim.deepcopy(M.default_graphql_panel_keymaps)
+
+  config_keymaps = type(config_keymaps) == "table" and vim.tbl_extend("force", default_keymaps, config_keymaps)
+    or default_keymaps
+
+  return config_keymaps
+end
+
+local function is_send_request_map(map)
+  return type(map) == "table"
+    and type(map[1]) == "string"
+    and (map.desc == "Send request" or map.desc == "Send request <cr>")
+end
+
+---HTTP send-request keys, so the explorer accepts the same mapping as an .http buffer.
+local function http_send_request_maps()
+  local config = require("kulala.config")
+  local maps = {}
+  local function add(list)
+    if type(list) ~= "table" then return end
+    for _, map in ipairs(list) do
+      if is_send_request_map(map) then maps[#maps + 1] = map end
+    end
+  end
+  add(config.options.global_keymaps)
+  local ft = config.options.ft_keymaps
+  if type(ft) == "table" then add(ft.http) end
+  return maps
+end
+
+M.setup_graphql_panel_keymaps = function(buf)
+  local keymaps = M.get_graphql_panel_keymaps() or {}
+
+  vim.iter(keymaps):each(function(name, map)
+    if map then
+      map.desc = map.desc or name
+      set_keymap(map, buf)
+    end
+  end)
+
+  vim.iter(http_send_request_maps()):each(function(map)
+    set_keymap(map, buf)
+  end)
+
+  return keymaps
 end
 
 M.setup_openapi_panel_keymaps = function(buf)
