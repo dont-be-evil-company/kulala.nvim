@@ -214,9 +214,12 @@ function M.parse_http_stream_line(line)
   return value
 end
 
----Stop the in-flight kulala-core subprocess (e.g. Ctrl+C interrupt).
+---Stop the in-flight kulala-core request. A daemon call is cancelled in place.
+---A one-shot fallback process is stopped with SIGTERM.
 ---@return boolean stopped
 function M.interrupt_active()
+  local Daemon = require("kulala.cmd.kulala_core_daemon")
+  if Daemon.cancel_active() then return true end
   local job = M.active_job
   if not job then return false end
   M.active_job = nil
@@ -230,7 +233,7 @@ end
 ---@param cwd string|nil
 ---@param on_done fun(job: vim.SystemCompleted)
 ---@param hooks? { on_http_stream?: fun(event: table), timeout_ms?: number, track?: "active"|"search"|"none" }
-function M.invoke_async(payload, cwd, on_done, hooks)
+local function invoke_oneshot(payload, cwd, on_done, hooks)
   local exe = M.require_enabled()
   hooks = hooks or {}
   local track = hooks.track or "active"
@@ -335,6 +338,36 @@ end
 
 ---@param payload table
 ---@param cwd string|nil
+---@param on_done fun(job: vim.SystemCompleted)
+---@param hooks? { on_http_stream?: fun(event: table), timeout_ms?: number, track?: "active"|"search"|"none" }
+function M.invoke_async(payload, cwd, on_done, hooks)
+  local exe = M.require_enabled()
+  hooks = hooks or {}
+  local timeout_ms = nil
+  if not payload_keep_alive(payload) then
+    timeout_ms = hooks.timeout_ms
+    if timeout_ms == nil then timeout_ms = invoke_timeout_ms() end
+  end
+  require("kulala.cmd.kulala_core_daemon").request(
+    {
+      exe = exe,
+      data_dir = M.effective_data_dir(),
+      env = env_with_data_dir(),
+      payload = payload,
+      cwd = cwd,
+      timeout_ms = timeout_ms,
+      track = hooks.track or "active",
+      on_http_stream = hooks.on_http_stream,
+    },
+    on_done,
+    function()
+      invoke_oneshot(payload, cwd, on_done, hooks)
+    end
+  )
+end
+
+---@param payload table
+---@param cwd string|nil
 ---@param hooks? { timeout_ms?: number, track?: "active"|"search"|"none" }
 ---@return vim.SystemCompleted
 function M.invoke(payload, cwd, hooks)
@@ -349,12 +382,15 @@ function M.invoke(payload, cwd, hooks)
   vim.wait(wait_ms, function()
     return done
   end, 20)
-  if not done and hooks and hooks.track == "search" and M.search_job then
-    local job = M.search_job
-    M.search_job = nil
-    pcall(function()
-      job:kill("sigterm")
-    end)
+  if not done and hooks and hooks.track == "search" then
+    require("kulala.cmd.kulala_core_daemon").cancel_search()
+    if M.search_job then
+      local job = M.search_job
+      M.search_job = nil
+      pcall(function()
+        job:kill("sigterm")
+      end)
+    end
   end
   return completed or { code = 124, stdout = "", stderr = "kulala-core subprocess timed out" }
 end
@@ -1081,6 +1117,116 @@ function M.clear_openapi_schema(cache_key)
   return false, "invalid kulala-core clear_openapi_schema output", nil
 end
 
+---Load the GraphQL explorer schema and current selection for the block at cursor.
+---@param bufnr? integer
+---@param line? integer 1-based line (defaults to cursor)
+---@param column? integer 1-based column
+---@return table|nil result { ok, graphql? }
+---@return string|nil err
+function M.graphql_explorer_load(bufnr, line, column)
+  M.require_enabled()
+  local payload, cwd = cursor_request_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  if type(line) == "number" then payload.line = line end
+  if type(column) == "number" then payload.column = column end
+  payload.action = "graphql_explorer_load"
+  payload.env = require("kulala.parser.env").get_current_env() or "default"
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.ok == true and type(res.graphql) == "table" then return res, nil end
+  if res and res.error then return res, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_load failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_load output"
+end
+
+---Apply one GraphQL explorer edit and return the patched body.
+---@param bufnr? integer
+---@param line? integer
+---@param column? integer
+---@param edit table
+---@return table|nil result
+---@return string|nil err
+function M.graphql_explorer_patch(bufnr, line, column, edit)
+  M.require_enabled()
+  local payload, cwd = cursor_request_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  if type(line) == "number" then payload.line = line end
+  if type(column) == "number" then payload.column = column end
+  payload.action = "graphql_explorer_patch"
+  payload.edit = edit
+  payload.env = require("kulala.parser.env").get_current_env() or "default"
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.ok == true then return res, nil end
+  if res and res.error then return res, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_patch failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_patch output"
+end
+
+---Run the GraphQL request with explorer operators removed.
+---@param bufnr? integer
+---@param line? integer
+---@param column? integer
+---@return table|nil item
+---@return string|nil err
+function M.graphql_explorer_run(bufnr, line, column)
+  M.require_enabled()
+  local payload, cwd = buffer_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  payload.action = "graphql_explorer_run"
+  payload.env = require("kulala.parser.env").get_current_env() or "default"
+  if type(line) == "number" then
+    payload.line = line
+    payload.column = column or 1
+  else
+    local pos = vim.api.nvim_win_get_cursor(0)
+    payload.line = pos[1]
+    payload.column = pos[2]
+  end
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and (res.success == true or res.success == false) then return res, nil end
+  if res and res.error then return res, res.error end
+  if job.code ~= 0 then
+    return nil, vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_run failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_run output"
+end
+
+---Serialize the explorer block without the explorer operators.
+---@param bufnr? integer
+---@param line? integer
+---@param column? integer
+---@return string|nil content
+---@return string|nil err
+function M.graphql_explorer_to_http(bufnr, line, column)
+  M.require_enabled()
+  local payload, cwd = buffer_payload(bufnr)
+  if not payload then return nil, "invalid buffer" end
+  payload.action = "graphql_explorer_to_http"
+  if type(line) == "number" then
+    payload.line = line
+    payload.column = column or 1
+  else
+    local pos = vim.api.nvim_win_get_cursor(0)
+    payload.line = pos[1]
+    payload.column = pos[2]
+  end
+  local job = M.invoke(payload, cwd)
+  local res = decode_action_response(job.stdout)
+  if res and res.ok == true and type(res.content) == "string" then return res.content, nil end
+  if res and res.error then return nil, res.error end
+  if job.code ~= 0 then
+    return nil,
+      vim.trim(job.stderr or "") ~= "" and vim.trim(job.stderr) or "kulala-core graphql_explorer_to_http failed"
+  end
+  return nil, "invalid kulala-core graphql_explorer_to_http output"
+end
+
 ---Load OpenAPI spec and return explorer tree for block at cursor.
 ---@param bufnr? integer
 ---@param line? integer 1-based line (defaults to cursor)
@@ -1441,7 +1587,6 @@ function M.websocket_start(opts, handlers, cwd)
   local exe = M.executable_path()
   if not exe then return nil end
 
-  local tmp = vim.fn.tempname() .. ".json"
   local payload = {
     url = opts.url,
     headers = opts.headers,
@@ -1452,16 +1597,15 @@ function M.websocket_start(opts, handlers, cwd)
   else
     payload.body = opts.body
   end
-  vim.fn.writefile({ vim.json.encode(payload) }, tmp)
 
-  return vim.system({ exe, "--websocket", "-i", tmp }, {
-    stdin = true,
-    text = true,
-    cwd = cwd,
-    env = env_with_data_dir(),
-    stdout = handlers.on_stdout,
-    stderr = handlers.on_stderr,
-  }, handlers.on_exit)
+  return require("kulala.cmd.kulala_core_daemon").open_websocket(
+    exe,
+    M.effective_data_dir(),
+    env_with_data_dir(),
+    payload,
+    handlers,
+    cwd
+  )
 end
 
 ---@param err string|nil

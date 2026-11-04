@@ -274,6 +274,16 @@ local M = {
     }
   ]]
 
+  -- GraphQL explorer panel keymaps; override with custom keymaps as required
+  -- (see docs or lua/kulala/config/keymaps.lua)
+  ---@type boolean|table
+  graphql_panel_keymaps = true,
+  --[[
+    {
+      ["Toggle field"] = { "<Space>", function() require("kulala.ui.graphql_explorer").toggle() end, },
+    }
+  ]]
+
   -- Forward script console output (`console.*`, `client.log`) to vim.notify.
   -- Set to false to disable. Use a table to customize title or handler.
   ---@type boolean|KulalaScriptConsoleNotifyConfig
@@ -287,6 +297,23 @@ local M = {
       end,
     }
   ]]
+
+  graphql_panel = {
+    --- Split placement for the explorer buffer (same values as `split_direction`).
+    split = "right",
+    signs = { folded = ">", expanded = "v" },
+    highlights = {
+      root = "Title",
+      field = "Function",
+      arg = "Identifier",
+      type = "Type",
+      badge = "Special",
+      description = "Comment",
+      checked = "String",
+      header = "Comment",
+      value = "Constant",
+    },
+  },
 
   openapi_panel = {
     --- Split placement for the explorer buffer (same values as `split_direction`).

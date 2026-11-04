@@ -8,6 +8,7 @@ Table of Contents                           *kulala.graphql-table-of-contents*
   - Without variables               |kulala.graphql-graphql-without-variables|
   - Download GraphQL Server Schema|kulala.graphql-graphql-download-graphql-server-schema|
   - Autocompletion                     |kulala.graphql-graphql-autocompletion|
+  - Explorer                                |kulala.graphql-graphql-explorer|
 
 ==============================================================================
 1. GraphQL                                            *kulala.graphql-graphql*
@@ -86,5 +87,50 @@ For autocompletion and type checking to work, make sure:
 
 1. Request method is `GRAPHQL`
 2. GraphQL schema is downloaded
+
+EXPLORER                                    *kulala.graphql-graphql-explorer*
+
+Mark a `GRAPHQL` block with `# @kulala-graphql-explorer`. Sending that block
+opens a field explorer instead of running the query. Checking a field or
+argument rewrites the request body so the file stays in sync with the pane.
+Opening the pane again reads that body back into the checkboxes.
+
+Add `# @kulala-graphql-no-cache` on the same block to skip the schema cache
+and introspect again on every open.
+
+>http
+    ### People
+    # @kulala-graphql-explorer
+    GRAPHQL https://swapi-graphql.netlify.app/.netlify/functions/index
+
+    query {
+      person(id: "cGVvcGxlOjE=") {
+        name
+      }
+    }
+<
+
+The explorer buffer is `kulala://graphql-explorer` (`kulala_graphql`).
+
+Default keymaps (`graphql_panel_keymaps`, see |kulala.default-keymaps.txt|):
+
+- `<Tab>` or `za` - toggle fold
+- `<Space>` - toggle the field or argument under the cursor
+- `e` - edit the argument value under the cursor
+- `/` - filter fields by name, type, or description
+- `<CR>` - run the current query (normal response UI)
+- `Y` - yank the request without the explorer operators
+- `R` - clear this host's schema cache and reload
+- `q` - close the explorer
+
+A body loaded from `< file.graphql`, or a query that uses aliases, fragment
+definitions, or directives, is shown but not rewritten.
+
+You can also open the explorer with the code action "Open GraphQL explorer"
+or `:lua require("kulala").open_graphql_explorer()`.
+
+See |kulala.public-methods-open-graphql-explorer| and
+|kulala.configuration-options-configuration-options-graphql-panel|.
+
 
 vim:tw=78:ts=8:noet:ft=help:norl:

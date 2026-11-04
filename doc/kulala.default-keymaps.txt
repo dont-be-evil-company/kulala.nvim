@@ -106,6 +106,24 @@ Available when the OpenAPI explorer split is open. Enable with
 <
 
 
+GRAPHQL EXPLORER KEYMAPS
+
+Available when the GraphQL explorer split is open. Enable with
+`graphql_panel_keymaps = true` (default).
+
+>lua
+      ["Toggle fold"] = { "<Tab>", function() require("kulala.ui.graphql_explorer").toggle_fold() end, },
+      ["Toggle fold (za)"] = { "za", function() require("kulala.ui.graphql_explorer").toggle_fold() end, prefix = false, },
+      ["Toggle field"] = { "<Space>", function() require("kulala.ui.graphql_explorer").toggle() end, },
+      ["Run"] = { "<CR>", function() require("kulala.ui.graphql_explorer").run() end, prefix = false, },
+      ["Edit argument"] = { "e", function() require("kulala.ui.graphql_explorer").edit() end, },
+      ["Search"] = { "/", function() require("kulala.ui.graphql_explorer").search() end, },
+      ["Yank as HTTP"] = { "Y", function() require("kulala.ui.graphql_explorer").yank() end, prefix = false, },
+      ["Refresh"] = { "R", function() require("kulala.ui.graphql_explorer").refresh() end, },
+      ["Close"] = { "q", function() require("kulala.ui.graphql_explorer").close() end, },
+<
+
+
 KULALA LSP KEYMAPS
 
 >lua

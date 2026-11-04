@@ -60,6 +60,12 @@ local function code_actions_http()
       end,
     },
     {
+      group = "GraphQL",
+      title = "Open GraphQL explorer",
+      command = "open_graphql_explorer",
+      fn = Kulala.open_graphql_explorer,
+    },
+    {
       group = "OpenAPI",
       title = "Open OpenAPI explorer",
       command = "open_openapi_explorer",

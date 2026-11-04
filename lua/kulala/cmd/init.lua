@@ -993,6 +993,14 @@ local function kulala_core_deliver_result(item, target, duration_wall, callback,
     return
   end
 
+  if item.success == true and item.graphqlUi == true and type(item.graphql) == "table" then
+    local GRAPHQL_PANEL = require("kulala.ui.graphql_explorer")
+    GRAPHQL_PANEL.open(item.graphql, target, DB.get_current_buffer())
+    if advance_queue ~= false then M.queue:run_next() end
+    if invoke_ui_callback ~= false then callback(true, duration_wall, INLAY.icon_line_for_request(target), nil) end
+    return
+  end
+
   if item.success ~= true then
     local console = kulala_core_script_console(item)
     target._kulala_script_console = console

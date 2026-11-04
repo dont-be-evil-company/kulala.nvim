@@ -116,8 +116,10 @@
 ---@field kulala_keymaps boolean|table
 ---@field kulala_keymaps_prefix string
 ---@field openapi_panel_keymaps boolean|table
+---@field graphql_panel_keymaps boolean|table
 ---@field script_console_notify boolean|KulalaScriptConsoleNotifyConfig
 ---@field openapi_panel? table
+---@field graphql_panel? table
 ---@field initialized? boolean
 ---@field halt_on_error? boolean
 ---@field before_request? boolean|fun(request: DocumentRequest): boolean

@@ -215,6 +215,14 @@ GENERATE_BUG_REPORT
 GitHub issue with it.
 
 
+OPEN_GRAPHQL_EXPLORER      *kulala.public-methods-open-graphql-explorer*
+
+`require('kulala').open_graphql_explorer()` opens the GraphQL explorer for the
+explorer block at the cursor (same as the "Open GraphQL explorer" code action).
+
+See |kulala.graphql-graphql-explorer|.
+
+
 OPEN_OPENAPI_EXPLORER      *kulala.public-methods-open-openapi-explorer*
 
 `require('kulala').open_openapi_explorer()` opens the OpenAPI explorer for the

@@ -352,6 +352,9 @@ require("lazy").setup({
       -- OpenAPI explorer panel keymaps (see docs or lua/kulala/config/keymaps.lua)
       openapi_panel_keymaps = true,
 
+      -- GraphQL explorer panel keymaps (see docs or lua/kulala/config/keymaps.lua)
+      graphql_panel_keymaps = true,
+
       -- OpenAPI explorer split, fold signs, and highlight groups
       openapi_panel = {
         split = "right",
@@ -366,6 +369,23 @@ require("lazy").setup({
           description = "Comment",
           badge = "Comment",
           sign = "Special",
+          value = "Constant",
+        },
+      },
+
+      -- GraphQL explorer split, fold signs, and highlight groups
+      graphql_panel = {
+        split = "right",
+        signs = { folded = ">", expanded = "v" },
+        highlights = {
+          root = "Title",
+          field = "Function",
+          arg = "Identifier",
+          type = "Type",
+          badge = "Special",
+          description = "Comment",
+          checked = "String",
+          header = "Comment",
           value = "Constant",
         },
       },
